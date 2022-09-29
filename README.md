@@ -1,6 +1,6 @@
 # WatVisionRevival
 
-This template should help get you started developing with Vue 3 in Vite.
+Huge thanks to this project for having the image stitching code: https://github.com/latsic/imgalign
 
 ## Recommended IDE Setup
 
