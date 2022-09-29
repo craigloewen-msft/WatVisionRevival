@@ -1,12 +1,14 @@
-import Vue from 'vue'
-import Vuex from 'vuex'
+import { createStore } from "vuex";
 
-Vue.use(Vuex)
+import input from '@/store/input';
+import multiInput from '@/store/multiInput';
+import worker from '@/store/worker';
+import settings from '@/store/settings';
+import logs from '@/store/logs';
 
-export default new Vuex.Store({
+export default createStore({
   //strict: true,
   state: {
-    count: 0,
   },
   getters: {
   },
@@ -15,5 +17,10 @@ export default new Vuex.Store({
   actions: {
   },
   modules: {
+    worker,
+    settings,
+    input,
+    multiInput,
+    logs
   }
 })

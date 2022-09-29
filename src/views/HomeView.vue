@@ -73,8 +73,8 @@ export default {
   },
   mounted: function () {
 
-    // console.log("Store state: ", this.$store.state.count);
-    this.doCameraProcessing();
+    console.log("Store state: ", this.$store.state.count);
+    // this.doCameraProcessing();
 
   }
 }

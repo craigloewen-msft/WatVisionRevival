@@ -13,6 +13,14 @@ import { RouterLink, RouterView } from "vue-router";
   <RouterView />
 </template>
 
+<script>
+  export default {
+    created() {
+      this.$store.dispatch('settings/init');
+    },
+  }
+</script>
+
 <style scoped>
 
 </style>
