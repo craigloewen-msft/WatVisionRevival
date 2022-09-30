@@ -10,10 +10,15 @@
         </label>
       </div>
 
-      <button
-          @click="stitch">
-          Stitch
-        </button>
+      <button @click="stitch">
+        Stitch
+      </button>
+
+      <div>
+        Worker busy compute: {{ $store.getters['worker/busyCompute']}}
+        Worker Action info: {{ $store.getters['worker/currentActionInfo']}}
+        Worker Action info error: {{ $store.getters['logs/currentErrorMessage']}}
+      </div>
 
     </div>
 
@@ -21,12 +26,9 @@
     <app-input-images :polygons="$store.getters['input/polygons']" @addPolygonPoint="addPolygonPt" />
 
     <h3>Result</h3>
-    <app-image-result
-          :image-url="$store.getters['worker/results/imageDataUrl'](stitchName)"
-          :image-name="stitchName"
-          :projected="$store.getters['worker/results/stitcherProjected']"
-          :field-of-view="$store.getters['worker/results/stitcherFieldOfView']"
-        />
+    <app-image-result :image-url="$store.getters['worker/results/imageDataUrl'](stitchName)" :image-name="stitchName"
+      :projected="$store.getters['worker/results/stitcherProjected']"
+      :field-of-view="$store.getters['worker/results/stitcherFieldOfView']" />
   </div>
 </template>
 
@@ -96,12 +98,12 @@ export default {
       this.$store.dispatch('input/imageFile', { name, file });
     },
     fileChangeHandler(e) {
-      console.log("e: ",e);
-      this.onFileChanged("Whattt",e.target.files[0])
+      console.log("e: ", e);
+      this.onFileChanged("Whattt", e.target.files[0])
     },
-    generateFileChangeHandler(inName,e) {
-      console.log("Generating file change handler",inName);
-      this.onFileChanged(inName,e.target.files[0]);
+    generateFileChangeHandler(inName, e) {
+      console.log("Generating file change handler", inName);
+      this.onFileChanged(inName, e.target.files[0]);
     }
   },
   created() {
