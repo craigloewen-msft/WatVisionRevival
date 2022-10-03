@@ -11,6 +11,9 @@
         <canvas ref="screencanvas" class="output_canvas" style="border:3px solid;"></canvas>
       </div>
       <button v-on:click="getNewBaseScreenImage(this.lastSeenInputImage)">Snap new screen</button>
+      <div>{{ OCRStatus }}</div>
+      <div>Select progress: {{ selectProgress}}</div>
+      <div>{{ selectStatus }}</div>
     </div>
   </div>
 </template>
@@ -19,6 +22,7 @@
 import Hands from "@mediapipe/hands"
 import Camera from "@mediapipe/camera_utils"
 import DrawUtils from "@mediapipe/drawing_utils"
+import Tesseract from "tesseract.js"
 
 export default {
   data: function () {
@@ -30,6 +34,12 @@ export default {
       screenBaseImg: null,
       screenBaseImgLoaded: false,
       lastSeenInputImage: null,
+      OCRLinesData: null,
+      OCRStatus: "Not Started",
+      lineConfidenceThreshold: 60,
+      selectProgress: 0,
+      selectProgressSpeed: 0.12,
+      selectStatus: "Not selected",
     }
   },
   methods: {
@@ -62,13 +72,66 @@ export default {
       }
       return highestFingerTip;
     },
-    getNewBaseScreenImage(inputImage) {
-        let newImgSave = inputImage.toDataURL();
-        this.screenBaseImg = new Image();
-        this.screenBaseImg.src = newImgSave;
-        this.screenBaseImg.onload = function () {
-          this.screenBaseImgLoaded = true;
-        }.bind(this);
+    fingerTipSelectionHandler() {
+      // If the finger tip is not null 
+      if (this.fingerTipPosition && this.OCRLinesData) {
+
+        // Check if the finger tip is hovering over any of the OCR lines
+        for (let i = 0; i < this.OCRLinesData.length; i++) {
+          const line = this.OCRLinesData[i];
+          let isHovering = this.fingerTipPosition.x < line.bbox.x1 && this.fingerTipPosition.x > line.bbox.x0 && this.fingerTipPosition.y < line.bbox.y1 && this.fingerTipPosition.y > line.bbox.y0;
+          if (isHovering) {
+            this.selectProgress += this.selectProgressSpeed;
+            if (this.selectProgress > 1) {
+              this.selectProgress = 0;
+              this.selectStatus = "Selected! " + line.text;
+              if ('speechSynthesis' in window) {
+                console.log("Speech command!");
+                var msg = new SpeechSynthesisUtterance(this.selectStatus);
+                window.speechSynthesis.speak(msg);
+              }
+            }
+            return;
+          }
+        }
+      }
+
+      this.selectProgress = 0;
+    },
+    async getNewBaseScreenImage(inputImage) {
+      let newImgSave = inputImage.toDataURL();
+      this.screenBaseImg = new Image();
+      this.screenBaseImg.src = newImgSave;
+      this.screenBaseImg.onload = function () {
+        this.screenBaseImgLoaded = true;
+      }.bind(this);
+
+      let updateStatusFunction = function (logger) {
+        this.OCRStatus = logger.status;
+      }.bind(this);
+
+      this.OCRLinesData = null;
+
+      // Get OCR of new base screen image
+      let dataResult = await Tesseract.recognize(newImgSave, 'eng', { logger: updateStatusFunction })
+      console.log(dataResult);
+      this.OCRLinesData = dataResult.data.lines;
+      this.OCRStatus = "Done";
+
+      // Filter out any low confidence lines
+      this.OCRLinesData = this.OCRLinesData.filter((line) => {
+        return line.confidence > this.lineConfidenceThreshold;
+      });
+
+      // Convert OCRLinesData bbox to percents instead of pixels
+      this.OCRLinesData.forEach((line) => {
+        line.bbox.x0 = line.bbox.x0 / inputImage.width;
+        line.bbox.x1 = line.bbox.x1 / inputImage.width;
+        line.bbox.y0 = line.bbox.y0 / inputImage.height;
+        line.bbox.y1 = line.bbox.y1 / inputImage.height;
+      })
+
+      console.log(this.OCRLinesData);
     },
     doScreenStitchingProcessing: function (handResults) {
       // Get image of new screen:
@@ -113,10 +176,38 @@ export default {
       }
       // If we have a finger tip position, draw a circle on it
       if (this.fingerTipPosition) {
-        this.screenCanvasCtx.beginPath();
-        this.screenCanvasCtx.arc(this.fingerTipPosition.x * this.canvasElement.width, this.fingerTipPosition.y * this.canvasElement.height, 10, 0, 2 * Math.PI);
-        this.screenCanvasCtx.stroke();
+        if (this.selectProgress > 0) {
+          this.screenCanvasCtx.strokeStyle = "#FFFFFF";
+          this.screenCanvasCtx.beginPath();
+          this.screenCanvasCtx.arc(this.fingerTipPosition.x * this.screenCanvasElement.width, this.fingerTipPosition.y * this.screenCanvasElement.height, 10, 0, 2 * Math.PI);
+          this.screenCanvasCtx.stroke();
+          // Fill in the circle based on the progress
+          this.screenCanvasCtx.strokeStyle = "#00FF00";
+          this.screenCanvasCtx.beginPath();
+          this.screenCanvasCtx.arc(this.fingerTipPosition.x * this.screenCanvasElement.width, this.fingerTipPosition.y * this.screenCanvasElement.height, 10, 0, 2 * Math.PI * this.selectProgress);
+          this.screenCanvasCtx.stroke();
+        } else {
+          this.screenCanvasCtx.beginPath();
+          this.screenCanvasCtx.arc(this.fingerTipPosition.x * this.canvasElement.width, this.fingerTipPosition.y * this.canvasElement.height, 10, 0, 2 * Math.PI);
+          this.screenCanvasCtx.stroke();
+        }
       }
+      // If we have line data draw the bounding boxes
+      if (this.OCRLinesData) {
+        this.OCRLinesData.forEach((line) => {
+          this.screenCanvasCtx.beginPath();
+          let confidence = line.confidence;
+
+          // Set the stroke color from red to green based on confidence
+          let red = Math.floor(255.0 * (100 - confidence) / 100.0);
+          let green = Math.floor(255.0 * confidence / 100.0);
+          this.screenCanvasCtx.strokeStyle = `rgb(${red},${green},0)`;
+
+          this.screenCanvasCtx.rect(line.bbox.x0 * this.screenCanvasElement.width, line.bbox.y0 * this.screenCanvasElement.height, (line.bbox.x1 - line.bbox.x0) * this.screenCanvasElement.width, (line.bbox.y1 - line.bbox.y0) * this.screenCanvasElement.height);
+          this.screenCanvasCtx.stroke();
+        })
+      }
+
       this.screenCanvasCtx.restore();
 
     },
@@ -124,6 +215,9 @@ export default {
 
       // Get finger tip position
       this.fingerTipPosition = this.getFingerTipPosition(handResults);
+
+      // Handle finger tip selection
+      this.fingerTipSelectionHandler();
 
       // Do screen processing to identify if screen stitching is needed
       this.doScreenStitchingProcessing(handResults);
@@ -146,7 +240,6 @@ export default {
 
       this.screenCanvasElement.width = 640;
       this.screenCanvasElement.height = 360;
-      this.screenCanvasCtx.strokeStyle = "#00FF00";
 
       let onResults = function (results) {
         this.cameraProcessLoop(results);
@@ -173,6 +266,9 @@ export default {
         height: 720
       });
       camera.start();
+
+
+
     }
   },
   mounted: function () {
