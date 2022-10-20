@@ -2,7 +2,7 @@
   "name": "watvisionrevival",
   "version": "0.0.0",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview --port 4173",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
@@ -16,6 +16,7 @@
     "axios": "^0.27.2",
     "exif-js": "^2.3.0",
     "file-saver": "^2.0.5",
+    "opencv.js": "^1.2.1",
     "pinia": "^2.0.21",
     "tesseract.js": "^3.0.3",
     "vue": "^3.2.38",

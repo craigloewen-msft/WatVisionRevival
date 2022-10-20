@@ -21,13 +21,33 @@ const getters = {
     return name => state.imageResults[name].imageData;
   },
   imageDataUrl(state) {
-    return name => state.imageResults[name].imageDataUrl;
+    console.log("Getting image data url");
+    return name => {
+      console.log("State: ", state);
+      console.log("Image results: ", state.imageResults);
+      console.log("Image results name: ", state.imageResults[name]);
+      state.imageResults[name].imageDataUrl;
+    }
+  },
+  newImageDataUrl() {
+    console.log("Getting image data url");
+    return name => {
+      console.log("State: ", state);
+      console.log("Image results: ", state.imageResults);
+      console.log("Image results name: ", state.imageResults[name]);
+      return state.imageResults[name].imageDataUrl;
+    }
   },
   imageDataValid(state) {
     return name => state.imageResults[name].imageDataValid;
   },
   success(state) {
-    return name => state.imageResults[name].success;
+    return name => {
+      console.log("Getting result for: ", name);
+      console.log(state.imageResults);
+      console.log(state.imageResults[name]);
+      return state.imageResults[name].success;
+    }
   },
   time(state) {
     return name => state.imageResults[name].time;
@@ -54,7 +74,7 @@ const getters = {
     return state.imageResults[stitchName].projected;
   },
   stitcherFieldOfView(state) {
-    return state.imageResults[stitchName].fieldOfView; 
+    return state.imageResults[stitchName].fieldOfView;
   },
 
   multiStitcherFieldOfView(state) {
@@ -64,8 +84,17 @@ const getters = {
 
 const mutations = {
   imageData(state, { name, imageData, imageDataSmall }) {
-    if(!imageData) state.imageResults[name].imageData = null;
-    else state.imageResults[name].setImageData(imageData, imageDataSmall);
+    console.log("Mutating image data for: ", name);
+    console.log(imageData);
+    if (!imageData) {
+      console.log("Yes Image data existed");
+      state.imageResults[name].imageData = null;
+    }
+    else {
+      console.log("No image data existed");
+      console.log(state.imageResults[name]);
+      state.imageResults[name].setImageData(imageData, imageDataSmall);
+    }
   },
   success(state, { name, success }) {
     state.imageResults[name].success = success;
@@ -74,7 +103,7 @@ const mutations = {
     state.imageResults[name].time = time;
   },
   settings(state, { name, settings }) {
-    if(!settings) return;
+    if (!settings) return;
     settings.copyValuesTo(state.imageResults[name].settings);
   },
 
@@ -99,7 +128,7 @@ const mutations = {
     return state.imageResults[stitchName].projected = value;
   },
   stitcherFieldOfView(state, value) {
-    return state.imageResults[stitchName].fieldOfView = value; 
+    return state.imageResults[stitchName].fieldOfView = value;
   },
 
   multiStitcherFieldOfView(state, value) {

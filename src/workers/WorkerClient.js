@@ -69,6 +69,10 @@ export class WorkerClient {
 
   async postWorkerMessageAsync(msg) {
 
+    if (msg == 'alignedImage') {
+      console.log('Sending alignedImage from Worker Client');
+    }
+
     return new Promise((resolve, reject) => {
 
       this.__messageDone = function(){ resolve(...arguments)};
@@ -242,6 +246,7 @@ export class WorkerClient {
   }
 
   async requestAlignedImageAsync() {
+    console.log("Calling requestAlignedImageAsync");
     return await this.postWorkerMessageAsync({ msg: msgAlignedImage });
   }
 

@@ -617,6 +617,7 @@ function resize(payload) {
 }
 
 function alignedImage() {
+  console.log("Starting aligned image function");
   throwIfImageNotAvailable();
 
   let alignedImage = new cv.Mat();
@@ -861,7 +862,7 @@ function waitForOpencv(callbackFn, waitTimeMs = 30000, stepTimeMs = 100) {
 
 onmessage = function(e) {
   // eslint-disable-next-line no-console
-  // console.log(`[webworker_matcher][received][msg][${e.data.msg}]`);
+  console.log(`[webworker_matcher][received][msg][${e.data.msg}]`);
   consoleLog(`[webworker_matcher][received][msg][${e.data.msg}]`);
 
   let startTime = new Date();
@@ -896,6 +897,7 @@ onmessage = function(e) {
       break;
     }
     case msgAlignedImage: {
+      console.log("On message: Aligned Image");
       postMessageFn = alignedImage();
       break;
     }

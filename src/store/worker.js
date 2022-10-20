@@ -185,6 +185,9 @@ const actions = {
       context.commit('_busyImage', true);
       context.commit('error', null);
       const imageData = await fn();
+      console.log("Setting image data: ", matchName);
+      console.log("And image data: ");
+      console.log(imageData);
       context.commit('results/imageData', { name: matchName, imageData });
     }
     catch(error) {
@@ -315,6 +318,7 @@ const actions = {
         fixedImagePolygonPts, movingImagePolygonPts);
 
       context.commit('results/time', { name: matchName, time: new Date() - matchStartTime });
+      console.log("Success committing: ", matchName);
       context.commit('results/success', { name: matchName, success });
     }
     catch(error) {
@@ -329,11 +333,13 @@ const actions = {
       context.commit('_busyCompute', false);
     }
 
+    console.log("Success dispatching request Image: ", context);
     await context.dispatch('requestImage');
   },
   async requestImage(context) {
 
     const matcherImageTypeValue = context.getters['results/matcherImageType'];
+    console.log("Matcher image type: ", matcherImageTypeValue);
 
     switch(matcherImageTypeValue) {
       case matcherImageType.aligned:
@@ -413,7 +419,9 @@ const actions = {
   },
   async requestAlignedImage(context) {
     context.commit('currentActionInfo', 'Requesting aligned image');
+    console.log("Requesting aligned image from requestAlignedImage");
     context.dispatch('_requestImage', async () => {
+      console.log("In async function request aligned image");
       return await WorkerClient.instance.requestAlignedImageAsync();
     });
   },

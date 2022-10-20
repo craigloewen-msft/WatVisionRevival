@@ -11,9 +11,18 @@
         <canvas ref="screencanvas" class="output_canvas" style="border:3px solid;"></canvas>
       </div>
       <button v-on:click="getNewBaseScreenImage(this.lastSeenInputImage)">Snap new screen</button>
+      <button v-on:click="manualMatch()">Manual Match</button>
+      <button v-on:click="checkMatch()">Check match</button>
       <div>{{ OCRStatus }}</div>
       <div>Select progress: {{ selectProgress}}</div>
       <div>{{ selectStatus }}</div>
+      <div>Action info: {{ currentActionInfo }}</div>
+      <div>
+        <h3>Result</h3>
+        <app-image-result :image-url="$store.getters['worker/results/newImageDataUrl']('result')"
+          :image-name="'result'" />
+        <app-input-images :polygons="$store.getters['input/polygons']" />
+      </div>
     </div>
   </div>
 </template>
@@ -22,9 +31,20 @@
 import Hands from "@mediapipe/hands"
 import Camera from "@mediapipe/camera_utils"
 import DrawUtils from "@mediapipe/drawing_utils"
-import Tesseract from "tesseract.js"
+import ImageResult from '../components/common/ImageResult.vue';
+import InputImages from '../components/common/InputImages.vue';
+import { createWorker } from 'tesseract.js';
 
 export default {
+  components: {
+    'AppImageResult': ImageResult,
+    'AppInputImages': InputImages,
+  },
+  computed: {
+    currentActionInfo() {
+      return this.$store.getters['worker/currentActionInfo'];
+    },
+  },
   data: function () {
     return {
       canvasElement: null,
@@ -32,6 +52,8 @@ export default {
       screenCanvasElement: null,
       screenCanvasCtx: null,
       screenBaseImg: null,
+      screenBaseImgWidth: 1280,
+      screenBaseImgHeight: 720,
       screenBaseImgLoaded: false,
       lastSeenInputImage: null,
       OCRLinesData: null,
@@ -40,6 +62,7 @@ export default {
       selectProgress: 0,
       selectProgressSpeed: 0.12,
       selectStatus: "Not selected",
+      lastSelectedText: "",
     }
   },
   methods: {
@@ -86,9 +109,11 @@ export default {
               this.selectProgress = 0;
               this.selectStatus = "Selected! " + line.text;
               if ('speechSynthesis' in window) {
-                console.log("Speech command!");
-                var msg = new SpeechSynthesisUtterance(this.selectStatus);
-                window.speechSynthesis.speak(msg);
+                if (this.lastSelectedText != line.text) {
+                  this.lastSelectedText = line.text;
+                  let utterance = new SpeechSynthesisUtterance(line.text);
+                  speechSynthesis.speak(utterance);
+                }
               }
             }
             return;
@@ -113,10 +138,24 @@ export default {
       this.OCRLinesData = null;
 
       // Get OCR of new base screen image
-      let dataResult = await Tesseract.recognize(newImgSave, 'eng', { logger: updateStatusFunction })
-      console.log(dataResult);
-      this.OCRLinesData = dataResult.data.lines;
-      this.OCRStatus = "Done";
+      const worker = createWorker({
+        logger: updateStatusFunction
+      });
+
+      let recognizeFunction = async function () {
+        await worker.load();
+        await worker.loadLanguage('eng');
+        await worker.initialize('eng');
+        // await worker.setParameters({
+        //   tessedit_char_whitelist: '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ',
+        // });
+        const dataResult = await worker.recognize(newImgSave);
+        this.OCRLinesData = dataResult.data.lines;
+        this.OCRStatus = "Done";
+        await worker.terminate();
+      }.bind(this);
+
+      await recognizeFunction();
 
       // Filter out any low confidence lines
       this.OCRLinesData = this.OCRLinesData.filter((line) => {
@@ -131,7 +170,6 @@ export default {
         line.bbox.y1 = line.bbox.y1 / inputImage.height;
       })
 
-      console.log(this.OCRLinesData);
     },
     doScreenStitchingProcessing: function (handResults) {
       // Get image of new screen:
@@ -143,6 +181,41 @@ export default {
         return;
       }
 
+    },
+    async manualMatch() {
+      await this.match(this.screenBaseImg, this.lastSeenInputImage);
+    },
+    async match(inFixedImage, inMovingImage) {
+
+      await this.$store.dispatch('input/inputImageData', { name: "fixed", inImage: inFixedImage, width: this.screenBaseImgWidth, height: this.screenBaseImgHeight });
+      await this.$store.dispatch('input/inputImageData', { name: "moving", inImage: inMovingImage, width: this.screenBaseImgWidth, height: this.screenBaseImgHeight });
+
+      console.log("Fixed image before starting");
+      console.log(this.$store.getters['input/imageData']("fixed"));
+
+      await this.$store.dispatch('worker/computeStitchedImage', {
+        fixedImage: this.$store.getters['input/imageData']("fixed"),
+        movingImage: this.$store.getters['input/imageData']("moving"),
+        fixedImagePolygonPts: this.$store.getters['input/polygonClosedPts']("fixed"),
+        movingImagePolygonPts: this.$store.getters['input/polygonClosedPts']("moving"),
+        settings: this.$store.getters['settings/settings']
+      });
+
+      if (this.$store.getters['worker/results/success']('result')) {
+        await this.$store.dispatch('worker/displayStitchedImage');
+      }
+
+    },
+    async checkMatch() {
+      console.log(this.$store.getters['worker/results/success']('result'));
+    },
+    mapNewFrameOntoScreen: function (handResults) {
+      if (this.screenBaseImg) {
+        let newScreenImg = handResults.image;
+
+        // 
+
+      }
     },
     renderImages: function (handResults) {
 
@@ -219,6 +292,9 @@ export default {
       // Handle finger tip selection
       this.fingerTipSelectionHandler();
 
+      // Map new frame onto identified screen
+      this.mapNewFrameOntoScreen(handResults);
+
       // Do screen processing to identify if screen stitching is needed
       this.doScreenStitchingProcessing(handResults);
 
@@ -266,10 +342,12 @@ export default {
         height: 720
       });
       camera.start();
-
-
-
     }
+  },
+  created: function () {
+    this.$store.dispatch('input/init');
+    this.$store.dispatch('worker/load');
+    this.$store.commit('worker/results/matcherImageType', 'Side by side inlier matches');
   },
   mounted: function () {
     this.startCameraProcessing();

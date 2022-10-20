@@ -14,18 +14,20 @@ import { paramTypes } from '@/models/constants/params';
 function setFieldOfView(context, imageName, fieldOfView) {
   context.commit('imageFieldOfView', { name: imageName, fieldOfView });
 
-  if(imageName == fixedImageName) {
+  if (imageName == fixedImageName) {
 
     context.dispatch('settings/param', {
       id: paramTypes.stitch_fieldOfView1.id,
-      value: fieldOfView }, {
+      value: fieldOfView
+    }, {
       root: true
     });
   }
-  else if(imageName == movingImageName) {
+  else if (imageName == movingImageName) {
     context.dispatch('settings/param', {
       id: paramTypes.stitch_fieldOfView2.id,
-      value: fieldOfView }, {
+      value: fieldOfView
+    }, {
       root: true
     });
   }
@@ -35,19 +37,21 @@ function setAlreadyProjected(context, imageName, value) {
 
   context.commit('imageProjected', { name: imageName, projected: value });
 
-  if(value) {
+  if (value) {
 
-    if(imageName == fixedImageName) {
+    if (imageName == fixedImageName) {
       context.dispatch('settings/param', {
         id: paramTypes.stitch_projection.id,
-        value: paramTypes.stitch_projectionTypeNone.id }, {
+        value: paramTypes.stitch_projectionTypeNone.id
+      }, {
         root: true
       });
     }
-    else if(imageName == movingImageName) {
+    else if (imageName == movingImageName) {
       context.dispatch('settings/param', {
         id: paramTypes.stitch_projection2.id,
-        value: paramTypes.stitch_projectionTypeNone.id }, {
+        value: paramTypes.stitch_projectionTypeNone.id
+      }, {
         root: true
       });
     }
@@ -88,8 +92,8 @@ const state = {
 }
 
 const getters = {
-  
-  imageData(state){
+
+  imageData(state) {
     return name => state.imageData[name];
   },
   imageDataUrl(state, getters) {
@@ -99,12 +103,12 @@ const getters = {
   },
   imageDataValid(state) {
     return name => state.imageData[name]
-        && state.imageData[name].width > 0
-        && state.imageData[name].height > 0;
+      && state.imageData[name].width > 0
+      && state.imageData[name].height > 0;
   },
   allImageDataValid(state, getters) {
     return getters['imageDataValid'](fixedImageName)
-        && getters['imageDataValid'](movingImageName);
+      && getters['imageDataValid'](movingImageName);
   },
   allImageNames() {
     return [fixedImageName, movingImageName];
@@ -126,7 +130,7 @@ const getters = {
   polygonClosedPts(state) {
     return name => {
       const polygon = state.polygons[name];
-      if(!polygon.isClosed()) return []
+      if (!polygon.isClosed()) return []
       return polygon.pts;
     }
   },
@@ -164,10 +168,10 @@ const getters = {
 
   pathPts(state) {
     return name => {
-      if(state.polygons[name].pts.length == 0) {
+      if (state.polygons[name].pts.length == 0) {
         return [];
       }
-      if(state.polygons[name].isClosed()) {
+      if (state.polygons[name].isClosed()) {
         return state.polygons[name].pts.slice(1);
       }
       return state.polygons[name].pts;
@@ -175,21 +179,21 @@ const getters = {
   },
   pathPtsFixedImage(state) {
     const poly = state.polygons[fixedImageName];
-    if(poly.pts.length == 0) return [];
-    if(poly.isClosed()) return poly.pts.slice(1);
+    if (poly.pts.length == 0) return [];
+    if (poly.isClosed()) return poly.pts.slice(1);
     return poly.pts;
   },
   pathPtsMovingImage(state) {
     const poly = state.polygons[movingImageName];
-    if(poly.pts.length == 0) return [];
-    if(poly.isClosed()) return poly.pts.slice(1);
+    if (poly.pts.length == 0) return [];
+    if (poly.isClosed()) return poly.pts.slice(1);
     return poly.pts;
   },
 
   floodFillTolerances(state) {
     return name => {
-      if(state.floodFillTolerances[name].length == 0) return [];
-      if(state.polygons[name].isClosed()) {
+      if (state.floodFillTolerances[name].length == 0) return [];
+      if (state.polygons[name].isClosed()) {
         return state.floodFillTolerances[name].slice(1);
       }
       return state.floodFillTolerances[name];
@@ -212,7 +216,7 @@ const getters = {
 }
 
 const mutations = {
- 
+
   imageData(state, { name, imageData }) {
     state.imageData[name] = imageData;
   },
@@ -227,7 +231,7 @@ const mutations = {
   },
   addPolygonPt(state, { name, pt, floodFillTolerance }) {
 
-    if(state.polygons[name].isClosed()) {
+    if (state.polygons[name].isClosed()) {
       state.polygons[name] = new Polygon();
       state.floodFillTolerances[name] = [];
     }
@@ -253,7 +257,7 @@ const actions = {
       { name: movingImageName, dataUrl: urls ? urls.url2 : defaultImage2 }
     ];
 
-    for(const { name, dataUrl } of defaultImages) {
+    for (const { name, dataUrl } of defaultImages) {
       const img = new Image();
       img.onload = () => {
         try {
@@ -265,7 +269,7 @@ const actions = {
           context.commit('busy', { name, value: false });
         }
       }
-      if(dataUrl) {
+      if (dataUrl) {
         img.src = dataUrl;
         context.commit('busy', { name, value: true });
       }
@@ -274,62 +278,67 @@ const actions = {
 
   init(context, urls) {
 
-    if(context.getters['imageDataValid'](fixedImageName) ||
-       context.getters['imageDataValid'](movingImageName)) {
-      
+    if (context.getters['imageDataValid'](fixedImageName) ||
+      context.getters['imageDataValid'](movingImageName)) {
+
       return;
     }
     context.dispatch('loadDefaultImages', urls);
   },
   async imageData({ commit, dispatch, rootGetters }, { name, imageData, doResizeIf = true }) {
-    
-    if(doResizeIf && imageData && rootGetters['worker/ready']) {
+
+    console.log("Name of image: " + name);
+    console.log("Image data for imageData function: ");
+    console.log(imageData);
+
+    if (doResizeIf && imageData && rootGetters['worker/ready']) {
       const maxPixelsN = rootGetters['settings/param'](paramTypes.imageCapInput.id);
-      if(imageData.width * imageData.height > maxPixelsN) {
+      if (imageData.width * imageData.height > maxPixelsN) {
         const scaleF = Math.sqrt(maxPixelsN / (imageData.width * imageData.height));
         const height = Math.floor(imageData.height * scaleF);
         const width = Math.floor(imageData.width * scaleF);
-        if(rootGetters['worker/ready'])
+        if (rootGetters['worker/ready'])
           await dispatch('worker/setInputImageResized', {
             imageName: name,
             imageDataSrc: imageData,
             width,
-            height }, {
-              root: true
-              });
+            height
+          }, {
+            root: true
+          });
         return;
       }
     }
 
     commit('imageData', { name, imageData });
-    
+
     dispatch('_imageDataUrl', { name, imageData });
     commit('resetPolygon', name);
     commit('imageFieldOfView', { name, fieldOfView: null });
     commit('imageProjected', { name, projected: false });
-    
-    if(rootGetters['worker/ready']) {
+
+    if (rootGetters['worker/ready']) {
       dispatch('worker/resetWorkerData', null, { root: true });
-      commit('worker/results/imageData', { name: matchName, imageData: null}, { root: true });
-      commit('worker/results/imageData', { name: compareName, imageData: null}, { root: true });
-      commit('worker/results/imageData', { name: stitchName, imageData: null}, { root: true });
+      commit('worker/results/imageData', { name: matchName, imageData: null }, { root: true });
+      commit('worker/results/imageData', { name: compareName, imageData: null }, { root: true });
+      commit('worker/results/imageData', { name: stitchName, imageData: null }, { root: true });
     }
   },
   _imageDataUrl({ commit }, { name, imageData }) {
-    if(!imageData) commit('_imageDataUrl', { name, imageDataUrl: null });
+    if (!imageData) commit('_imageDataUrl', { name, imageDataUrl: null });
     else commit('_imageDataUrl', { name, imageDataUrl: ImageDataConversion.imageSrcFromImageData(imageData) });
   },
   async imageFile(context, { name, file }) {
-    console.log("Changing image for: ",name);
+    console.log("Changing image for: ", name);
 
-    const img = new Image(); 
+    const img = new Image();
     img.onload = async () => {
       try {
         const imageData = ImageDataConversion.imageDataFromImageSrc(img);
         await context.dispatch('imageData', { name, imageData });
-        
+
         const fieldOfView = await ExifHelper.getFieldOfViewAsync(img);
-        if(fieldOfView) {
+        if (fieldOfView) {
           setFieldOfView(context, name, fieldOfView);
         }
 
@@ -339,27 +348,27 @@ const actions = {
         context.commit('busy', { name, value: false });
       }
     }
-    if(file) {
+    if (file) {
       context.commit('busy', { name, value: true });
       img.src = URL.createObjectURL(file);
     }
   },
   async imageUrlBase64(context, { name, url, fieldOfView, projected }) {
-    const img = new Image(); 
+    const img = new Image();
     img.onload = async () => {
       try {
         const imageData = ImageDataConversion.imageDataFromImageSrc(img);
 
         await context.dispatch('imageData', { name, imageData });
-        
-        if(!fieldOfView) {
+
+        if (!fieldOfView) {
           fieldOfView = await ExifHelper.getFieldOfViewAsync(img);
         }
 
-        if(fieldOfView) {
+        if (fieldOfView) {
           setFieldOfView(context, name, fieldOfView);
         }
-        if(projected) {
+        if (projected) {
           setAlreadyProjected(context, name, projected);
         }
 
@@ -369,10 +378,14 @@ const actions = {
         context.commit('busy', { name, value: false });
       }
     }
-    if(url) {
+    if (url) {
       context.commit('busy', { name, value: true });
       img.src = url;
     }
+  },
+  async inputImageData(context, { name, inImage, width, height }) {
+    const imageData = ImageDataConversion.imageDataFromImageSrcWidthHeight(inImage, width, height);
+    await context.dispatch('imageData', { name, imageData, doResizeIf: false });
   }
 }
 

@@ -1,5 +1,5 @@
 export class ImageDataConversion {
-  
+
   static imageDataFromImageSrc(imageSrc) {
 
     const startTime = new Date();
@@ -17,6 +17,23 @@ export class ImageDataConversion {
     return imageData;
   }
 
+  static imageDataFromImageSrcWidthHeight(imageSrc, width, height) {
+
+    const startTime = new Date();
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imageSrc, 0, 0, width, height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    // eslint-disable-next-line no-console
+    console.log('[imageDataFromImageSrc][time][ms]', new Date() - startTime);
+
+    return imageData;
+  }
+
   static imageSrcFromImageData(imageData) {
 
     const startTime = new Date();
@@ -26,7 +43,7 @@ export class ImageDataConversion {
 
     canvas.width = imageData.width;
     canvas.height = imageData.height;
-    
+
     ctx.putImageData(imageData, 0, 0);
     const url = canvas.toDataURL();
 
@@ -44,14 +61,14 @@ export class ImageDataConversion {
 
     canvas.width = imageData.width;
     canvas.height = imageData.height;
-    
+
     ctx.putImageData(imageData, 0, 0);
-    
+
     const blob = await new Promise(resolve => {
       try {
         canvas.toBlob(blob => resolve(blob), 'image/png', 1);
       }
-      catch(error) {
+      catch (error) {
         // eslint-disable-next-line no-console
         console.log('[imageBlobFromImageData][toBlob][Error]', error);
         resolve(null);

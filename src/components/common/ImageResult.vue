@@ -31,7 +31,7 @@
         @dragend.prevent="() => {}"
       >
     </div>
-    <v-dialog
+    <!-- <v-dialog
       :attach="$refs.mainDiv"
       :ref="dialog.name"
       v-model="showDialog"
@@ -54,7 +54,7 @@
         @mousedown.left.stop="startDrag"
         @touchstart.stop="startDrag"
       >
-    </v-dialog>
+    </v-dialog> -->
   </div>
 </template>
 
