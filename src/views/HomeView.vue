@@ -2,26 +2,35 @@
   <div>
     <div class="container">
       <video class="input_video videoContainer"></video>
-      <div>Main Canvas:</div>
+      <div>Render Canvas:</div>
       <div class="canvasContainer">
-        <canvas ref="canvas" class="output_canvas" style="border:3px solid;"></canvas>
+        <canvas ref="rendercanvas" class="output_canvas" style="border:3px solid;"></canvas>
       </div>
-      <div>Screen canvas: </div>
+      <div>Video Canvas:</div>
+      <div class="canvasContainer">
+        <canvas ref="videocanvas" class="output_canvas" style="border:3px solid;"></canvas>
+      </div>
+      <div>Screen base: </div>
       <div class="canvasContainer">
         <canvas ref="screencanvas" class="output_canvas" style="border:3px solid;"></canvas>
       </div>
+      <div>Screen render: </div>
+      <div class="canvasContainer">
+        <canvas ref="screenrendercanvas" class="output_canvas" style="border:3px solid;"></canvas>
+      </div>
       <button v-on:click="getNewBaseScreenImage(this.lastSeenInputImage)">Snap new screen</button>
-      <button v-on:click="manualMatch()">Manual Match</button>
-      <button v-on:click="checkMatch()">Check match</button>
+      <button v-on:click="manualMatch()">Check match</button>
       <div>{{ OCRStatus }}</div>
-      <div>Select progress: {{ selectProgress}}</div>
+      <div>Select progress: {{ selectProgress }}</div>
       <div>{{ selectStatus }}</div>
       <div>Action info: {{ currentActionInfo }}</div>
       <div>
         <h3>Result</h3>
-        <app-image-result :image-url="$store.getters['worker/results/newImageDataUrl']('result')"
-          :image-name="'result'" />
-        <app-input-images :polygons="$store.getters['input/polygons']" />
+        <div class="canvasContainer">
+          <canvas ref="matchinfocanvas" class="output_canvas" id="matchinfocanvas" style="border:3px solid;"></canvas>
+          <canvas ref="matchresultcanvas" class="output_canvas" id="matchresultcanvas"
+            style="border:3px solid;"></canvas>
+        </div>
       </div>
     </div>
   </div>
@@ -34,6 +43,7 @@ import DrawUtils from "@mediapipe/drawing_utils"
 import ImageResult from '../components/common/ImageResult.vue';
 import InputImages from '../components/common/InputImages.vue';
 import { createWorker } from 'tesseract.js';
+import imageFunctions from "../imageFunctions.js";
 
 export default {
   components: {
@@ -47,7 +57,9 @@ export default {
   },
   data: function () {
     return {
-      canvasElement: null,
+      renderCanvasCtx: null,
+      renderCanvasElement: null,
+      videoCanvasElement: null,
       canvasCtx: null,
       screenCanvasElement: null,
       screenCanvasCtx: null,
@@ -63,6 +75,11 @@ export default {
       selectProgressSpeed: 0.12,
       selectStatus: "Not selected",
       lastSelectedText: "",
+      lastSeenInputImageData: null,
+      screenBaseImgData: null,
+      screenRenderCanvasCtx: null,
+      screenRenderCanvasElement: null,
+      baseScreenImgStitchedCanvas: null,
     }
   },
   methods: {
@@ -93,16 +110,37 @@ export default {
         }, fingerTipLandmarks[0]);
 
       }
-      return highestFingerTip;
+
+      if (highestFingerTip) {
+        let fingerTipToScreenCoords = {};
+        fingerTipToScreenCoords.x = highestFingerTip.x * this.screenCanvasElement.width;
+        fingerTipToScreenCoords.y = highestFingerTip.y * this.screenCanvasElement.height;
+
+        return fingerTipToScreenCoords;
+      } else {
+        return null;
+      }
+    },
+    mapFingerTipPositionToBaseImage(inFingerTipPosition) {
+      if (this.homographyMat && inFingerTipPosition) {
+        let returnPoint = imageFunctions.perspectiveTransformWithMat(inFingerTipPosition, this.homographyMat);
+        return returnPoint;
+      } else {
+        return inFingerTipPosition;
+      }
     },
     fingerTipSelectionHandler() {
       // If the finger tip is not null 
       if (this.fingerTipPosition && this.OCRLinesData) {
 
+        let absoluteFingerTipPosition = {};
+        absoluteFingerTipPosition.x = this.fingerTipPosition.x / this.screenCanvasElement.width;
+        absoluteFingerTipPosition.y = this.fingerTipPosition.y / this.screenCanvasElement.height;
+
         // Check if the finger tip is hovering over any of the OCR lines
         for (let i = 0; i < this.OCRLinesData.length; i++) {
           const line = this.OCRLinesData[i];
-          let isHovering = this.fingerTipPosition.x < line.bbox.x1 && this.fingerTipPosition.x > line.bbox.x0 && this.fingerTipPosition.y < line.bbox.y1 && this.fingerTipPosition.y > line.bbox.y0;
+          let isHovering = absoluteFingerTipPosition.x < line.bbox.x1 && absoluteFingerTipPosition.x > line.bbox.x0 && absoluteFingerTipPosition.y < line.bbox.y1 && absoluteFingerTipPosition.y > line.bbox.y0;
           if (isHovering) {
             this.selectProgress += this.selectProgressSpeed;
             if (this.selectProgress > 1) {
@@ -124,11 +162,18 @@ export default {
       this.selectProgress = 0;
     },
     async getNewBaseScreenImage(inputImage) {
+
       let newImgSave = inputImage.toDataURL();
       this.screenBaseImg = new Image();
       this.screenBaseImg.src = newImgSave;
       this.screenBaseImg.onload = function () {
         this.screenBaseImgLoaded = true;
+
+        // Draw the image to the screen canvas
+        this.screenCanvasCtx.drawImage(this.screenBaseImg, 0, 0, this.screenCanvasElement.width, this.screenCanvasElement.height);
+
+        // Get the image data
+        this.screenBaseImgData = this.screenCanvasCtx.getImageData(0, 0, this.screenCanvasElement.width, this.screenCanvasElement.height);
       }.bind(this);
 
       let updateStatusFunction = function (logger) {
@@ -183,117 +228,132 @@ export default {
 
     },
     async manualMatch() {
-      await this.match(this.screenBaseImg, this.lastSeenInputImage);
+      // await this.match(this.screenBaseImgData, this.lastSeenInputImageData);
+      await this.match(this.lastSeenInputImageData, this.screenBaseImgData);
     },
     async match(inFixedImage, inMovingImage) {
+      // Get ImageData from Image
+      try {
+        let [matchImage, resultImage, homographyMat] = imageFunctions.doCVStuff(inMovingImage, inFixedImage);
 
-      await this.$store.dispatch('input/inputImageData', { name: "fixed", inImage: inFixedImage, width: this.screenBaseImgWidth, height: this.screenBaseImgHeight });
-      await this.$store.dispatch('input/inputImageData', { name: "moving", inImage: inMovingImage, width: this.screenBaseImgWidth, height: this.screenBaseImgHeight });
+        this.homographyMat = homographyMat;
+        cv.imshow('matchresultcanvas', resultImage);
+        cv.imshow('matchinfocanvas', matchImage);
 
-      console.log("Fixed image before starting");
-      console.log(this.$store.getters['input/imageData']("fixed"));
-
-      await this.$store.dispatch('worker/computeStitchedImage', {
-        fixedImage: this.$store.getters['input/imageData']("fixed"),
-        movingImage: this.$store.getters['input/imageData']("moving"),
-        fixedImagePolygonPts: this.$store.getters['input/polygonClosedPts']("fixed"),
-        movingImagePolygonPts: this.$store.getters['input/polygonClosedPts']("moving"),
-        settings: this.$store.getters['settings/settings']
-      });
-
-      if (this.$store.getters['worker/results/success']('result')) {
-        await this.$store.dispatch('worker/displayStitchedImage');
+      } catch (error) {
+        console.log("Error");
+        console.log(error);
       }
-
     },
     async checkMatch() {
       console.log(this.$store.getters['worker/results/success']('result'));
     },
     mapNewFrameOntoScreen: function (handResults) {
       if (this.screenBaseImg) {
-        let newScreenImg = handResults.image;
-
-        // 
-
+        // this.manualMatch();
       }
     },
     renderImages: function (handResults) {
 
-      this.lastSeenInputImage = handResults.image;
+      let canvasToRenderCtx = this.renderCanvasCtx;
+      let canvasToRenderElement = this.renderCanvasElement;
 
-      // Render the main canvas
-      this.canvasCtx.save();
-      this.canvasCtx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
-      this.canvasCtx.drawImage(
-        handResults.image, 0, 0, this.canvasElement.width, this.canvasElement.height);
+      // Render the video feed
+      this.videoCanvasCtx.save();
+      this.videoCanvasCtx.clearRect(0, 0, this.videoCanvasElement.width, this.videoCanvasElement.height);
+      this.videoCanvasCtx.drawImage(handResults.image, 0, 0, this.videoCanvasElement.width, this.videoCanvasElement.height);
+
+      // Render the render canvas
+      canvasToRenderCtx.save();
+      canvasToRenderCtx.clearRect(0, 0, canvasToRenderElement.width, canvasToRenderElement.height);
+      canvasToRenderCtx.drawImage(
+        handResults.image, 0, 0, canvasToRenderElement.width, canvasToRenderElement.height);
       if (handResults.multiHandLandmarks) {
         for (const landmarks of handResults.multiHandLandmarks) {
-          DrawUtils.drawConnectors(this.canvasCtx, landmarks, Hands.HAND_CONNECTIONS,
+          DrawUtils.drawConnectors(canvasToRenderCtx, landmarks, Hands.HAND_CONNECTIONS,
             { color: '#00FF00', lineWidth: 5 });
-          DrawUtils.drawLandmarks(this.canvasCtx, landmarks, { color: '#FF0000', lineWidth: 2 });
+          DrawUtils.drawLandmarks(canvasToRenderCtx, landmarks, { color: '#FF0000', lineWidth: 2 });
         }
         // If we have a finger tip position, draw a circle on it
         if (this.fingerTipPosition) {
-          this.canvasCtx.beginPath();
-          this.canvasCtx.arc(this.fingerTipPosition.x * this.canvasElement.width, this.fingerTipPosition.y * this.canvasElement.height, 10, 0, 2 * Math.PI);
-          this.canvasCtx.stroke();
+          canvasToRenderCtx.beginPath();
+          canvasToRenderCtx.arc(this.fingerTipPosition.x * canvasToRenderElement.width, this.fingerTipPosition.y * canvasToRenderElement.height, 10, 0, 2 * Math.PI);
+          canvasToRenderCtx.stroke();
         }
       }
-      this.canvasCtx.restore();
+      canvasToRenderCtx.restore();
 
-      // Render the screen canvas
-      this.screenCanvasCtx.save();
-      this.screenCanvasCtx.clearRect(0, 0, this.screenCanvasElement.width, this.screenCanvasElement.height);
+      // Render the screen render canvas
+      let screenCanvasCtxToRender = this.screenRenderCanvasCtx;
+      let screenCanvasElementToRender = this.screenRenderCanvasElement;
+
+      screenCanvasElementToRender.width = this.baseScreenImgStitchedCanvas.width;
+      screenCanvasElementToRender.height = this.baseScreenImgStitchedCanvas.height;
+
+      screenCanvasCtxToRender.save();
+      screenCanvasCtxToRender.clearRect(0, 0, screenCanvasElementToRender.width, screenCanvasElementToRender.height);
       if (this.screenBaseImgLoaded) {
-        this.screenCanvasCtx.drawImage(this.screenBaseImg, 0, 0, this.screenCanvasElement.width, this.screenCanvasElement.height);
+        // screenCanvasCtxToRender.drawImage(this.screenBaseImg, 0, 0, screenCanvasElementToRender.width, screenCanvasElementToRender.height);
+        screenCanvasCtxToRender.drawImage(this.baseScreenImgStitchedCanvas, 0, 0, screenCanvasElementToRender.width, screenCanvasElementToRender.height);
       }
       // If we have a finger tip position, draw a circle on it
       if (this.fingerTipPosition) {
+        this.renderCanvasCtx.beginPath();
+        this.renderCanvasCtx.arc(this.fingerTipPositionUnmapped.x, this.fingerTipPositionUnmapped.y, 10, 0, 2 * Math.PI);
+        this.renderCanvasCtx.stroke();
         if (this.selectProgress > 0) {
-          this.screenCanvasCtx.strokeStyle = "#FFFFFF";
-          this.screenCanvasCtx.beginPath();
-          this.screenCanvasCtx.arc(this.fingerTipPosition.x * this.screenCanvasElement.width, this.fingerTipPosition.y * this.screenCanvasElement.height, 10, 0, 2 * Math.PI);
-          this.screenCanvasCtx.stroke();
+          screenCanvasCtxToRender.strokeStyle = "#FFFFFF";
+          screenCanvasCtxToRender.beginPath();
+          screenCanvasCtxToRender.arc(this.fingerTipPosition.x, this.fingerTipPosition.y, 10, 0, 2 * Math.PI);
+          screenCanvasCtxToRender.stroke();
           // Fill in the circle based on the progress
-          this.screenCanvasCtx.strokeStyle = "#00FF00";
-          this.screenCanvasCtx.beginPath();
-          this.screenCanvasCtx.arc(this.fingerTipPosition.x * this.screenCanvasElement.width, this.fingerTipPosition.y * this.screenCanvasElement.height, 10, 0, 2 * Math.PI * this.selectProgress);
-          this.screenCanvasCtx.stroke();
+          screenCanvasCtxToRender.strokeStyle = "#00FF00";
+          screenCanvasCtxToRender.beginPath();
+          screenCanvasCtxToRender.arc(this.fingerTipPosition.x, this.fingerTipPosition.y, 10, 0, 2 * Math.PI * this.selectProgress);
+          screenCanvasCtxToRender.stroke();
         } else {
-          this.screenCanvasCtx.beginPath();
-          this.screenCanvasCtx.arc(this.fingerTipPosition.x * this.canvasElement.width, this.fingerTipPosition.y * this.canvasElement.height, 10, 0, 2 * Math.PI);
-          this.screenCanvasCtx.stroke();
+          screenCanvasCtxToRender.beginPath();
+          screenCanvasCtxToRender.arc(this.fingerTipPosition.x, this.fingerTipPosition.y, 10, 0, 2 * Math.PI);
+          screenCanvasCtxToRender.stroke();
         }
       }
       // If we have line data draw the bounding boxes
       if (this.OCRLinesData) {
         this.OCRLinesData.forEach((line) => {
-          this.screenCanvasCtx.beginPath();
+          screenCanvasCtxToRender.beginPath();
           let confidence = line.confidence;
 
           // Set the stroke color from red to green based on confidence
           let red = Math.floor(255.0 * (100 - confidence) / 100.0);
           let green = Math.floor(255.0 * confidence / 100.0);
-          this.screenCanvasCtx.strokeStyle = `rgb(${red},${green},0)`;
+          screenCanvasCtxToRender.strokeStyle = `rgb(${red},${green},0)`;
 
-          this.screenCanvasCtx.rect(line.bbox.x0 * this.screenCanvasElement.width, line.bbox.y0 * this.screenCanvasElement.height, (line.bbox.x1 - line.bbox.x0) * this.screenCanvasElement.width, (line.bbox.y1 - line.bbox.y0) * this.screenCanvasElement.height);
-          this.screenCanvasCtx.stroke();
+          screenCanvasCtxToRender.rect(line.bbox.x0 * screenCanvasElementToRender.width, line.bbox.y0 * screenCanvasElementToRender.height, (line.bbox.x1 - line.bbox.x0) * screenCanvasElementToRender.width, (line.bbox.y1 - line.bbox.y0) * screenCanvasElementToRender.height);
+          screenCanvasCtxToRender.stroke();
         })
       }
 
-      this.screenCanvasCtx.restore();
-
+      screenCanvasCtxToRender.restore();
     },
     cameraProcessLoop: function (handResults) {
 
-      // Get finger tip position
-      this.fingerTipPosition = this.getFingerTipPosition(handResults);
+      // Set last seen input image
+      this.lastSeenInputImage = handResults.image;
 
-      // Handle finger tip selection
-      this.fingerTipSelectionHandler();
+      // Get lastSeenInputImageData
+      this.lastSeenInputImageData = this.videoCanvasCtx.getImageData(0, 0, this.videoCanvasElement.width, this.videoCanvasElement.height);
 
       // Map new frame onto identified screen
       this.mapNewFrameOntoScreen(handResults);
+
+      // Get finger tip position
+      this.fingerTipPositionUnmapped = this.getFingerTipPosition(handResults);
+
+      // Get finger tip position mapped to base image
+      this.fingerTipPosition = this.mapFingerTipPositionToBaseImage(this.fingerTipPositionUnmapped);
+
+      // Handle finger tip selection
+      this.fingerTipSelectionHandler();
 
       // Do screen processing to identify if screen stitching is needed
       this.doScreenStitchingProcessing(handResults);
@@ -305,17 +365,31 @@ export default {
     startCameraProcessing: function () {
 
       const videoElement = document.getElementsByClassName('input_video')[0];
-      this.canvasElement = this.$refs.canvas;
-      this.canvasCtx = this.canvasElement.getContext('2d');
+      this.videoCanvasElement = this.$refs.videocanvas;
+      this.videoCanvasCtx = this.videoCanvasElement.getContext('2d');
+
+      this.videoCanvasElement.width = 640;
+      this.videoCanvasElement.height = 360;
+
+      this.renderCanvasElement = this.$refs.rendercanvas;
+      this.renderCanvasCtx = this.renderCanvasElement.getContext('2d');
+
+      this.renderCanvasElement.width = 640;
+      this.renderCanvasElement.height = 360;
+
+      this.screenRenderCanvasCtx = this.$refs.screenrendercanvas.getContext('2d');
+      this.screenRenderCanvasElement = this.$refs.screenrendercanvas;
+
+      this.screenRenderCanvasElement.width = 640;
+      this.screenRenderCanvasElement.height = 360;
 
       this.screenCanvasElement = this.$refs.screencanvas;
       this.screenCanvasCtx = this.screenCanvasElement.getContext('2d');
 
-      this.canvasElement.width = 640;
-      this.canvasElement.height = 360;
-
       this.screenCanvasElement.width = 640;
       this.screenCanvasElement.height = 360;
+
+      this.baseScreenImgStitchedCanvas = this.$refs.matchresultcanvas;
 
       let onResults = function (results) {
         this.cameraProcessLoop(results);
@@ -345,9 +419,9 @@ export default {
     }
   },
   created: function () {
-    this.$store.dispatch('input/init');
-    this.$store.dispatch('worker/load');
-    this.$store.commit('worker/results/matcherImageType', 'Side by side inlier matches');
+    // this.$store.dispatch('input/init');
+    // this.$store.dispatch('worker/load');
+    // this.$store.commit('worker/results/matcherImageType', 'Side by side inlier matches');
   },
   mounted: function () {
     this.startCameraProcessing();

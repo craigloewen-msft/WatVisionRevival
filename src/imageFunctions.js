@@ -1,17 +1,3 @@
-
-let mFixedMat = null;
-let mMovingMat = null;
-let mImgAlign = null;
-
-let mTransMat = null;
-let mFixedPtsGood = null;
-let mMovingPtsGood = null;
-let mFixedPtsInlier = null;
-let mMovingPtsInlier = null;
-
-let mImgStitch = null;
-let mMultiStitchImages = null;
-
 export default {
     copyOver(source, destination, homographyMat) {
         // From here: https://stackoverflow.com/questions/13063201/how-to-show-the-whole-image-when-using-opencv-warpperspective
@@ -151,10 +137,13 @@ export default {
         cv.line(result, {x: cornersTransformed.data32F[4], y: cornersTransformed.data32F[5]}, {x: cornersTransformed.data32F[6], y: cornersTransformed.data32F[7]}, new cv.Scalar(0, 255, 0, 255), 2);
         cv.line(result, {x: cornersTransformed.data32F[6], y: cornersTransformed.data32F[7]}, {x: cornersTransformed.data32F[0], y: cornersTransformed.data32F[1]}, new cv.Scalar(0, 255, 0, 255), 2);
 
-        return result;
+        return [result,translatedHomographyMat];
     },
     doCVStuff(mainImage, toAlignImage) {
         // Implementation used from this blog: https://scottsuhy.com/2021/02/01/image-alignment-feature-based-in-opencv-js-javascript
+
+        console.log("Main image: ", mainImage);
+        console.log("To align image: ", toAlignImage);
 
         let im1Input = cv.matFromImageData(mainImage);
         let im2Input = cv.matFromImageData(toAlignImage);
@@ -249,9 +238,18 @@ export default {
         let blendedImage = new cv.Mat();
         cv.addWeighted(mainImageMat, 0.5, warpedPerspectiveImage, 0.5, 0, blendedImage);
 
+        let [combinedImage,translatedHomographyMat] = this.copyOver(mainImageMat, toAlignImageMat,homographyMat);
 
-        let combinedImage = this.copyOver(mainImageMat, toAlignImageMat,homographyMat);
+        return [imMatches, combinedImage, translatedHomographyMat];
+    },
+    perspectiveTransformWithMat: function (mainPoint, homographyMat) {
+        const inPoint = new cv.Mat(1, 1, cv.CV_32FC2);
+        inPoint.data32F[0] = mainPoint.x;
+        inPoint.data32F[1] = mainPoint.y;
 
-        return [imMatches, combinedImage];
+        // Transform the corners of destination to the new coordinate system
+        let outPoint = new cv.Mat();
+        cv.perspectiveTransform(inPoint, outPoint, homographyMat);
+        return {x: outPoint.data32F[0], y: outPoint.data32F[1]};
     }
 }
