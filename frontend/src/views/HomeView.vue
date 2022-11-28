@@ -6,9 +6,8 @@
       <div class="canvasContainer">
         <canvas ref="rendercanvas" class="output_canvas" style="border:3px solid;"></canvas>
       </div>
-      <div>Video Canvas:</div>
       <div class="canvasContainer">
-        <canvas ref="videocanvas" class="output_canvas" style="border:3px solid;"></canvas>
+        <canvas id = "videocanvas" ref="videocanvas" class="output_canvas" style="border:3px solid;"></canvas>
       </div>
       <div>Screen base: </div>
       <div class="canvasContainer">
@@ -18,8 +17,10 @@
       <div class="canvasContainer">
         <canvas ref="screenrendercanvas" class="output_canvas" style="border:3px solid;"></canvas>
       </div>
-      <button v-on:click="getNewBaseScreenImage(this.lastSeenInputImage)">Snap new screen</button>
-      <button v-on:click="manualMatch()">Check match</button>
+      <div class="bottomControls">
+        <button v-on:click="getNewBaseScreenImage(this.lastSeenInputImage)">Snap new screen</button>
+        <button v-on:click="manualMatch()">Check match</button>
+      </div>
       <div>{{ OCRStatus }}</div>
       <div>Select progress: {{ selectProgress }}</div>
       <div>{{ selectStatus }}</div>
@@ -79,7 +80,8 @@ export default {
       screenBaseImgData: null,
       screenRenderCanvasCtx: null,
       screenRenderCanvasElement: null,
-      baseScreenImgStitchedCanvas: null,
+      baseScreenImgStitchedCanvasElement: null,
+      baseScreenImgStitchedCanvasCtx: null,
     }
   },
   methods: {
@@ -163,6 +165,9 @@ export default {
     },
     async getNewBaseScreenImage(inputImage) {
 
+      console.log("Getting new screen base image");
+      console.log(inputImage);
+
       let newImgSave = inputImage.toDataURL();
       this.screenBaseImg = new Image();
       this.screenBaseImg.src = newImgSave;
@@ -171,6 +176,7 @@ export default {
 
         // Draw the image to the screen canvas
         this.screenCanvasCtx.drawImage(this.screenBaseImg, 0, 0, this.screenCanvasElement.width, this.screenCanvasElement.height);
+        this.baseScreenImgStitchedCanvasElement.getContext('2d').drawImage(this.screenBaseImg, 0, 0, this.screenCanvasElement.width, this.screenCanvasElement.height);
 
         // Get the image data
         this.screenBaseImgData = this.screenCanvasCtx.getImageData(0, 0, this.screenCanvasElement.width, this.screenCanvasElement.height);
@@ -221,7 +227,7 @@ export default {
       let newScreenImg = handResults.image;
 
       // If there is no base image set it and we are done
-      if (this.screenBaseImg == null) {
+      if (this.screenBaseImg == null && newScreenImg) {
         this.getNewBaseScreenImage(newScreenImg);
         return;
       }
@@ -287,14 +293,14 @@ export default {
       let screenCanvasCtxToRender = this.screenRenderCanvasCtx;
       let screenCanvasElementToRender = this.screenRenderCanvasElement;
 
-      screenCanvasElementToRender.width = this.baseScreenImgStitchedCanvas.width;
-      screenCanvasElementToRender.height = this.baseScreenImgStitchedCanvas.height;
+      screenCanvasElementToRender.width = this.baseScreenImgStitchedCanvasElement.width;
+      screenCanvasElementToRender.height = this.baseScreenImgStitchedCanvasElement.height;
 
       screenCanvasCtxToRender.save();
       screenCanvasCtxToRender.clearRect(0, 0, screenCanvasElementToRender.width, screenCanvasElementToRender.height);
       if (this.screenBaseImgLoaded) {
         // screenCanvasCtxToRender.drawImage(this.screenBaseImg, 0, 0, screenCanvasElementToRender.width, screenCanvasElementToRender.height);
-        screenCanvasCtxToRender.drawImage(this.baseScreenImgStitchedCanvas, 0, 0, screenCanvasElementToRender.width, screenCanvasElementToRender.height);
+        screenCanvasCtxToRender.drawImage(this.baseScreenImgStitchedCanvasElement, 0, 0, screenCanvasElementToRender.width, screenCanvasElementToRender.height);
       }
       // If we have a finger tip position, draw a circle on it
       if (this.fingerTipPosition) {
@@ -389,7 +395,11 @@ export default {
       this.screenCanvasElement.width = 640;
       this.screenCanvasElement.height = 360;
 
-      this.baseScreenImgStitchedCanvas = this.$refs.matchresultcanvas;
+      this.baseScreenImgStitchedCanvasElement = this.$refs.matchresultcanvas;
+      this.baseScreenImgStitchedCanvasCtx = this.baseScreenImgStitchedCanvasElement.getContext('2d');
+
+      this.baseScreenImgStitchedCanvasElement.width = 640;
+      this.baseScreenImgStitchedCanvasElement.height = 360;
 
       let onResults = function (results) {
         this.cameraProcessLoop(results);
@@ -433,4 +443,21 @@ export default {
 .videoContainer {
   display: none;
 }
+
+.bottomControls {
+  /* Always on bottom of screen */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background-color: #000000;
+  color: #FFFFFF;
+  padding: 10px;
+}
+
+#videocanvas {
+  display: none;
+}
+
 </style>
