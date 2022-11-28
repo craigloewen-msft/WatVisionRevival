@@ -8,7 +8,8 @@
     "build": "cd frontend; npm install; npm run build; cd ..; rm -rf ./dist; mv ./frontend/dist ./backend/",
     "dev": "concurrently --kill-others \"npm run backend-dev\" \"npm run frontend-dev\"",
     "backend-dev": "cd backend; npm run dev",
-    "frontend-dev": "cd frontend; npm run dev"
+    "frontend-dev": "cd frontend; npm run dev",
+    "start": "cd backend; npm run start"
   },
   "repository": {
     "type": "git",
