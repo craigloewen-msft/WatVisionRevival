@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="container">
-      <video class="input_video videoContainer"></video>
+      <video muted playsinline autoplay class="input_video videoContainer"></video>
       <div>Render Canvas:</div>
       <div class="canvasContainer">
         <canvas ref="rendercanvas" class="output_canvas" style="border:3px solid;"></canvas>
