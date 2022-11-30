@@ -7,7 +7,7 @@
         <canvas ref="rendercanvas" class="output_canvas" style="border:3px solid;"></canvas>
       </div>
       <div class="canvasContainer">
-        <canvas id = "videocanvas" ref="videocanvas" class="output_canvas" style="border:3px solid;"></canvas>
+        <canvas id="videocanvas" ref="videocanvas" class="output_canvas" style="border:3px solid;"></canvas>
       </div>
       <div>Screen base: </div>
       <div class="canvasContainer">
@@ -20,7 +20,6 @@
       <div class="bottomControls">
         <button v-on:click="getNewBaseScreenImage(this.lastSeenInputImage)">Snap new screen</button>
         <button v-on:click="manualMatch()">Check match</button>
-        <button v-on:click="changeCamera()">Change Camera</button>
       </div>
       <div>{{ OCRStatus }}</div>
       <div>Select progress: {{ selectProgress }}</div>
@@ -83,6 +82,7 @@ export default {
       screenRenderCanvasElement: null,
       baseScreenImgStitchedCanvasElement: null,
       baseScreenImgStitchedCanvasCtx: null,
+      maxScreenDimension: 600,
     }
   },
   methods: {
@@ -344,6 +344,10 @@ export default {
     },
     cameraProcessLoop: function (handResults) {
 
+      if (this.screenWidth == null && handResults.image) {
+        this.setScreenWidthandHeight(handResults.image.width, handResults.image.height);
+      }
+
       // Set last seen input image
       this.lastSeenInputImage = handResults.image;
 
@@ -369,38 +373,52 @@ export default {
       this.renderImages(handResults);
 
     },
+    setScreenWidthandHeight: function (width, height) {
+
+      let screenAspectRatio = width / height;
+      let screenAdjustMult = 1.0;
+
+      if (screenAspectRatio > 1) {
+        screenAdjustMult = this.maxScreenDimension / width;
+      } else {
+        screenAdjustMult = this.maxScreenDimension / height;
+      }
+
+      this.screenWidth = Math.round(width * screenAdjustMult);
+      this.screenHeight = Math.round(height * screenAdjustMult);
+
+      this.videoCanvasElement.width = this.screenWidth;
+      this.videoCanvasElement.height = this.screenHeight;
+
+      this.renderCanvasElement.width = this.screenWidth;
+      this.renderCanvasElement.height = this.screenHeight;
+
+      this.screenRenderCanvasElement.width = this.screenWidth;
+      this.screenRenderCanvasElement.height = this.screenHeight;
+
+      this.baseScreenImgStitchedCanvasElement.width = this.screenWidth;
+      this.baseScreenImgStitchedCanvasElement.height = this.screenHeight;
+
+      this.screenCanvasElement.width = this.screenWidth;
+      this.screenCanvasElement.height = this.screenHeight;
+    },
     startCameraProcessing: function () {
 
       const videoElement = document.getElementsByClassName('input_video')[0];
       this.videoCanvasElement = this.$refs.videocanvas;
       this.videoCanvasCtx = this.videoCanvasElement.getContext('2d');
 
-      this.videoCanvasElement.width = 640;
-      this.videoCanvasElement.height = 360;
-
       this.renderCanvasElement = this.$refs.rendercanvas;
       this.renderCanvasCtx = this.renderCanvasElement.getContext('2d');
-
-      this.renderCanvasElement.width = 640;
-      this.renderCanvasElement.height = 360;
 
       this.screenRenderCanvasCtx = this.$refs.screenrendercanvas.getContext('2d');
       this.screenRenderCanvasElement = this.$refs.screenrendercanvas;
 
-      this.screenRenderCanvasElement.width = 640;
-      this.screenRenderCanvasElement.height = 360;
-
       this.screenCanvasElement = this.$refs.screencanvas;
       this.screenCanvasCtx = this.screenCanvasElement.getContext('2d');
 
-      this.screenCanvasElement.width = 640;
-      this.screenCanvasElement.height = 360;
-
       this.baseScreenImgStitchedCanvasElement = this.$refs.matchresultcanvas;
       this.baseScreenImgStitchedCanvasCtx = this.baseScreenImgStitchedCanvasElement.getContext('2d');
-
-      this.baseScreenImgStitchedCanvasElement.width = 640;
-      this.baseScreenImgStitchedCanvasElement.height = 360;
 
       let onResults = function (results) {
         this.cameraProcessLoop(results);
@@ -428,9 +446,6 @@ export default {
         facingMode: "environment"
       });
       camera.start();
-    },
-    changeCamera: function () {
-
     },
   },
   created: function () {
@@ -464,5 +479,4 @@ export default {
 #videocanvas {
   display: none;
 }
-
 </style>
