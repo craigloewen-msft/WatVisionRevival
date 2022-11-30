@@ -20,6 +20,7 @@
       <div class="bottomControls">
         <button v-on:click="getNewBaseScreenImage(this.lastSeenInputImage)">Snap new screen</button>
         <button v-on:click="manualMatch()">Check match</button>
+        <button v-on:click="changeCamera()">Change Camera</button>
       </div>
       <div>{{ OCRStatus }}</div>
       <div>Select progress: {{ selectProgress }}</div>
@@ -423,10 +424,14 @@ export default {
           await hands.send({ image: videoElement });
         },
         width: 1280,
-        height: 720
+        height: 720,
+        facingMode: "environment"
       });
       camera.start();
-    }
+    },
+    changeCamera: function () {
+
+    },
   },
   created: function () {
     // this.$store.dispatch('input/init');
