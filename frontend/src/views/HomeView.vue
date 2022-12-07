@@ -6,29 +6,25 @@
       <div class="canvasContainer">
         <canvas ref="rendercanvas" class="output_canvas" style="border:3px solid;"></canvas>
       </div>
+      <div>Screen render: </div>
+      <div class="canvasContainer">
+        <canvas ref="screenrendercanvas" class="output_canvas" style="border:3px solid;"></canvas>
+      </div>
       <div class="canvasContainer">
         <canvas id="videocanvas" ref="videocanvas" class="output_canvas" style="border:3px solid;"></canvas>
       </div>
       <div>Screen base: </div>
       <div class="canvasContainer">
-        <canvas ref="screencanvas" class="output_canvas" style="border:3px solid;"></canvas>
-      </div>
-      <div>Screen render: </div>
-      <div class="canvasContainer">
-        <canvas ref="screenrendercanvas" class="output_canvas" style="border:3px solid;"></canvas>
+        <canvas id="screencanvas" ref="screencanvas" class="output_canvas" style="border:3px solid;"></canvas>
       </div>
       <div class="bottomControls">
         <button v-on:click="getNewBaseScreenImage(this.lastSeenInputImage)">Snap new screen</button>
-        <button v-on:click="manualMatch()">Check match</button>
       </div>
       <div>{{ OCRStatus }}</div>
       <div>Select progress: {{ selectProgress }}</div>
       <div>{{ selectStatus }}</div>
-      <div>Action info: {{ currentActionInfo }}</div>
       <div>
-        <h3>Result</h3>
         <div class="canvasContainer">
-          <canvas ref="matchinfocanvas" class="output_canvas" id="matchinfocanvas" style="border:3px solid;"></canvas>
           <canvas ref="matchresultcanvas" class="output_canvas" id="matchresultcanvas"
             style="border:3px solid;"></canvas>
         </div>
@@ -41,21 +37,10 @@
 import Hands from "@mediapipe/hands"
 import Camera from "@mediapipe/camera_utils"
 import DrawUtils from "@mediapipe/drawing_utils"
-import ImageResult from '../components/common/ImageResult.vue';
-import InputImages from '../components/common/InputImages.vue';
 import { createWorker } from 'tesseract.js';
 import imageFunctions from "../imageFunctions.js";
 
 export default {
-  components: {
-    'AppImageResult': ImageResult,
-    'AppInputImages': InputImages,
-  },
-  computed: {
-    currentActionInfo() {
-      return this.$store.getters['worker/currentActionInfo'];
-    },
-  },
   data: function () {
     return {
       renderCanvasCtx: null,
@@ -85,6 +70,7 @@ export default {
       maxScreenDimension: 600,
       processPeriodms: 1000,
       nextProcessms: 0,
+      baseScreenLoaded: false,
     }
   },
   methods: {
@@ -127,7 +113,7 @@ export default {
       }
     },
     mapFingerTipPositionToBaseImage(inFingerTipPosition) {
-      if (this.translatedHomographyMat && inFingerTipPosition) {
+      if (this.homographyMat && inFingerTipPosition) {
         let returnPoint = imageFunctions.perspectiveTransformWithMat(inFingerTipPosition, this.homographyMat);
         return returnPoint;
       } else {
@@ -168,6 +154,19 @@ export default {
         }
 
         this.mappedOCRBoxes = returnLines;
+      }
+
+      // Map the current image corners to the base screen image
+      if (this.lastSeenInputImageData && this.homographyMat) {
+        let points = [];
+        points.push({ x: 0, y: 0 });
+        points.push({ x: this.lastSeenInputImageData.width, y: 0 });
+        points.push({ x: this.lastSeenInputImageData.width, y: this.lastSeenInputImageData.height });
+        points.push({ x: 0, y: this.lastSeenInputImageData.height });
+
+        let mappedPoints = imageFunctions.perspectiveTransformArrayWithMat(points, this.homographyMat);
+
+        this.mappedInputImageCorners = mappedPoints;
       }
 
       this.fingerTipPosition = this.mapFingerTipPositionToBaseImage(this.fingerTipPositionUnmapped);
@@ -217,6 +216,7 @@ export default {
 
         // Get the image data
         this.screenBaseImgData = this.screenCanvasCtx.getImageData(0, 0, this.screenCanvasElement.width, this.screenCanvasElement.height);
+        this.baseScreenLoaded = true;
       }.bind(this);
 
       let updateStatusFunction = function (logger) {
@@ -259,43 +259,31 @@ export default {
       })
 
     },
-    doScreenStitchingProcessing: function (handResults) {
-      // Get image of new screen:
-      let newScreenImg = handResults.image;
-
-      // If there is no base image set it and we are done
-      if (this.screenBaseImg == null && newScreenImg) {
-        this.getNewBaseScreenImage(newScreenImg);
-        return;
-      }
-
-    },
-    async manualMatch() {
-      // await this.match(this.screenBaseImgData, this.lastSeenInputImageData);
-      this.match(this.lastSeenInputImageData, this.screenBaseImgData);
-    },
     match(inFixedImage, inMovingImage) {
       // Get ImageData from Image
       try {
-        let [matchImage, resultImage, homographyMat, inverseHomographyMat, translatedHomographyMat] = imageFunctions.alignTwoImages(inMovingImage, inFixedImage);
+        let [resultImage, homographyMat, inverseHomographyMat] = imageFunctions.alignTwoImages(inMovingImage, inFixedImage);
 
         this.homographyMat = homographyMat;
         this.inverseHomographyMat = inverseHomographyMat;
-        this.translatedHomographyMat = translatedHomographyMat;
 
-        cv.imshow('matchresultcanvas', resultImage);
-        cv.imshow('matchinfocanvas', matchImage);
+        // cv.imshow('matchresultcanvas', resultImage);
 
       } catch (error) {
         console.log("Error");
         console.log(error);
       }
     },
-    async checkMatch() {
-      console.log(this.$store.getters['worker/results/success']('result'));
-    },
     mapScreenLocationOntoFrame: function (handResults) {
-      if (this.screenBaseImg) {
+      // Get image of new screen:
+      let newScreenImg = handResults.image;
+
+      // If there is no base image set it
+      if (this.screenBaseImg == null && newScreenImg) {
+        this.getNewBaseScreenImage(newScreenImg);
+      }
+
+      if (this.screenBaseImg && this.baseScreenLoaded) {
         this.match(this.lastSeenInputImageData, this.screenBaseImgData);
       }
     },
@@ -406,6 +394,18 @@ export default {
         })
       }
 
+      // If we have screen corner data draw the corners of the new screen to the base screen
+      if (this.mappedInputImageCorners) {
+        screenCanvasCtxToRender.strokeStyle = "#FF0000";
+        screenCanvasCtxToRender.beginPath();
+        screenCanvasCtxToRender.moveTo(this.mappedInputImageCorners[0].x, this.mappedInputImageCorners[0].y);
+        screenCanvasCtxToRender.lineTo(this.mappedInputImageCorners[1].x, this.mappedInputImageCorners[1].y);
+        screenCanvasCtxToRender.lineTo(this.mappedInputImageCorners[2].x, this.mappedInputImageCorners[2].y);
+        screenCanvasCtxToRender.lineTo(this.mappedInputImageCorners[3].x, this.mappedInputImageCorners[3].y);
+        screenCanvasCtxToRender.lineTo(this.mappedInputImageCorners[0].x, this.mappedInputImageCorners[0].y);
+        screenCanvasCtxToRender.stroke();
+      }
+
       screenCanvasCtxToRender.restore();
       canvasToRenderCtx.restore();
     },
@@ -438,16 +438,11 @@ export default {
         // Handle finger tip selection
         this.fingerTipSelectionHandler();
 
-        // Do screen processing to identify if screen stitching is needed
-        this.doScreenStitchingProcessing(handResults);
-
         // Render any images
         this.renderImages(handResults);
 
       } else {
       }
-
-
     },
     setScreenWidthandHeight: function (width, height) {
 
@@ -524,11 +519,6 @@ export default {
       camera.start();
     },
   },
-  created: function () {
-    // this.$store.dispatch('input/init');
-    // this.$store.dispatch('worker/load');
-    // this.$store.commit('worker/results/matcherImageType', 'Side by side inlier matches');
-  },
   mounted: function () {
     this.startCameraProcessing();
   }
@@ -553,6 +543,14 @@ export default {
 }
 
 #videocanvas {
+  display: none;
+}
+
+#screencanvas {
+  display: none;
+}
+
+#matchresultcanvas {
   display: none;
 }
 </style>

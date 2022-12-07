@@ -235,9 +235,12 @@ export default {
         let blendedImage = new cv.Mat();
         cv.addWeighted(mainImageMat, 0.5, warpedPerspectiveImage, 0.5, 0, blendedImage);
 
-        let [combinedImage,translatedHomographyMat] = this.copyOver(mainImageMat, toAlignImageMat,homographyMat);
+        // let [combinedImage,translatedHomographyMat] = this.copyOver(mainImageMat, toAlignImageMat,homographyMat);
 
-        return [imMatches, combinedImage, homographyMat, inverseHomographyMat, translatedHomographyMat];
+        // Draw the outlines of the moving image onto the main image
+        let combinedImage = new cv.Mat();
+
+        return [combinedImage, homographyMat, inverseHomographyMat];
     },
     perspectiveTransformWithMat: function (mainPoint, homographyMat) {
         const inPoint = new cv.Mat(1, 1, cv.CV_32FC2);
