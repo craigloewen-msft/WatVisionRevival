@@ -81,8 +81,6 @@ export default {
         let xMinMax = cv.minMaxLoc(allXPts);
         let yMinMax = cv.minMaxLoc(allYPts);
 
-        console.log(xMinMax);
-
         const xmin = xMinMax.minVal; 
         const ymin = yMinMax.minVal;
 
@@ -139,11 +137,8 @@ export default {
 
         return [result,translatedHomographyMat];
     },
-    doCVStuff(mainImage, toAlignImage) {
+    alignTwoImages(mainImage, toAlignImage) {
         // Implementation used from this blog: https://scottsuhy.com/2021/02/01/image-alignment-feature-based-in-opencv-js-javascript
-
-        console.log("Main image: ", mainImage);
-        console.log("To align image: ", toAlignImage);
 
         let im1Input = cv.matFromImageData(mainImage);
         let im2Input = cv.matFromImageData(toAlignImage);
@@ -232,6 +227,8 @@ export default {
         mat2.data32F.set(points2);
         let homographyMat = cv.findHomography(mat1, mat2, cv.RANSAC);
 
+        let inverseHomographyMat = cv.findHomography(mat2, mat1, cv.RANSAC);
+
         let warpedPerspectiveImage = new cv.Mat();
         cv.warpPerspective(toAlignImageMat, warpedPerspectiveImage, homographyMat, mainImageMat.size());
 
@@ -240,7 +237,7 @@ export default {
 
         let [combinedImage,translatedHomographyMat] = this.copyOver(mainImageMat, toAlignImageMat,homographyMat);
 
-        return [imMatches, combinedImage, translatedHomographyMat];
+        return [imMatches, combinedImage, homographyMat, inverseHomographyMat, translatedHomographyMat];
     },
     perspectiveTransformWithMat: function (mainPoint, homographyMat) {
         const inPoint = new cv.Mat(1, 1, cv.CV_32FC2);
@@ -251,5 +248,26 @@ export default {
         let outPoint = new cv.Mat();
         cv.perspectiveTransform(inPoint, outPoint, homographyMat);
         return {x: outPoint.data32F[0], y: outPoint.data32F[1]};
+    },
+    perspectiveTransformArrayWithMat: function (mainPointArray, homographyMat) {
+        try {
+        const inPoint = new cv.Mat(mainPointArray.length, 1, cv.CV_32FC2);
+        for (let i = 0; i < mainPointArray.length; i++) {
+            inPoint.data32F[i * 2] = mainPointArray[i].x;
+            inPoint.data32F[i * 2 + 1] = mainPointArray[i].y;
+        }
+
+        // Transform the corners of destination to the new coordinate system
+        let outPoint = new cv.Mat();
+        cv.perspectiveTransform(inPoint, outPoint, homographyMat);
+        let outPointArray = [];
+        for (let i = 0; i < mainPointArray.length; i++) {
+            outPointArray.push({x: outPoint.data32F[i * 2], y: outPoint.data32F[i * 2 + 1]});
+        }
+        return outPointArray;
+    } catch (error) {
+        console.log("Error while transforming array with mat");
+        console.log(error);
+    }
     }
 }

@@ -71,9 +71,9 @@ export default {
       lastSeenInputImage: null,
       OCRLinesData: null,
       OCRStatus: "Not Started",
-      lineConfidenceThreshold: 60,
+      lineConfidenceThreshold: 10,
       selectProgress: 0,
-      selectProgressSpeed: 0.12,
+      selectProgressSpeed: 0.40,
       selectStatus: "Not selected",
       lastSelectedText: "",
       lastSeenInputImageData: null,
@@ -83,6 +83,8 @@ export default {
       baseScreenImgStitchedCanvasElement: null,
       baseScreenImgStitchedCanvasCtx: null,
       maxScreenDimension: 600,
+      processPeriodms: 1000,
+      nextProcessms: 0,
     }
   },
   methods: {
@@ -125,25 +127,59 @@ export default {
       }
     },
     mapFingerTipPositionToBaseImage(inFingerTipPosition) {
-      if (this.homographyMat && inFingerTipPosition) {
+      if (this.translatedHomographyMat && inFingerTipPosition) {
         let returnPoint = imageFunctions.perspectiveTransformWithMat(inFingerTipPosition, this.homographyMat);
         return returnPoint;
       } else {
         return inFingerTipPosition;
       }
     },
+    mapPositionsToBaseScreen() {
+
+      // For each bounding box put the points into an array
+      if (this.OCRLinesData && this.inverseHomographyMat) {
+        let points = [];
+        for (let i = 0; i < this.OCRLinesData.length; i++) {
+          let line = this.OCRLinesData[i];
+          points.push({ x: line.bbox.x0, y: line.bbox.y0 });
+          points.push({ x: line.bbox.x1, y: line.bbox.y1 });
+        }
+
+
+        // For each point in the array change it from a percent to a pixel value
+        for (let i = 0; i < points.length; i++) {
+          points[i].x = points[i].x * this.lastSeenInputImageData.width;
+          points[i].y = points[i].y * this.lastSeenInputImageData.height;
+        }
+
+        let mappedOCRPoints = imageFunctions.perspectiveTransformArrayWithMat(points, this.inverseHomographyMat);
+
+        let returnLines = [];
+
+        // For each bounding box put the points into an array
+        for (let i = 0; i < this.OCRLinesData.length; i++) {
+          let returnLine = { bbox: {}, confidence: this.OCRLinesData[i].confidence, text: this.OCRLinesData[i].text};
+          returnLine.bbox.x0 = mappedOCRPoints[i * 2].x;
+          returnLine.bbox.y0 = mappedOCRPoints[i * 2].y;
+          returnLine.bbox.x1 = mappedOCRPoints[i * 2 + 1].x;
+          returnLine.bbox.y1 = mappedOCRPoints[i * 2 + 1].y;
+
+          returnLines.push(returnLine);
+        }
+
+        this.mappedOCRBoxes = returnLines;
+      }
+
+      this.fingerTipPosition = this.mapFingerTipPositionToBaseImage(this.fingerTipPositionUnmapped);
+    },
     fingerTipSelectionHandler() {
       // If the finger tip is not null 
-      if (this.fingerTipPosition && this.OCRLinesData) {
-
-        let absoluteFingerTipPosition = {};
-        absoluteFingerTipPosition.x = this.fingerTipPosition.x / this.screenCanvasElement.width;
-        absoluteFingerTipPosition.y = this.fingerTipPosition.y / this.screenCanvasElement.height;
+      if (this.fingerTipPosition && this.mappedOCRBoxes) {
 
         // Check if the finger tip is hovering over any of the OCR lines
         for (let i = 0; i < this.OCRLinesData.length; i++) {
-          const line = this.OCRLinesData[i];
-          let isHovering = absoluteFingerTipPosition.x < line.bbox.x1 && absoluteFingerTipPosition.x > line.bbox.x0 && absoluteFingerTipPosition.y < line.bbox.y1 && absoluteFingerTipPosition.y > line.bbox.y0;
+          const line = this.mappedOCRBoxes[i];
+          let isHovering = this.fingerTipPosition.x < line.bbox.x1 && this.fingerTipPosition.x > line.bbox.x0 && this.fingerTipPosition.y < line.bbox.y1 && this.fingerTipPosition.y > line.bbox.y0;
           if (isHovering) {
             this.selectProgress += this.selectProgressSpeed;
             if (this.selectProgress > 1) {
@@ -236,14 +272,17 @@ export default {
     },
     async manualMatch() {
       // await this.match(this.screenBaseImgData, this.lastSeenInputImageData);
-      await this.match(this.lastSeenInputImageData, this.screenBaseImgData);
+      this.match(this.lastSeenInputImageData, this.screenBaseImgData);
     },
-    async match(inFixedImage, inMovingImage) {
+    match(inFixedImage, inMovingImage) {
       // Get ImageData from Image
       try {
-        let [matchImage, resultImage, homographyMat] = imageFunctions.doCVStuff(inMovingImage, inFixedImage);
+        let [matchImage, resultImage, homographyMat, inverseHomographyMat, translatedHomographyMat] = imageFunctions.alignTwoImages(inMovingImage, inFixedImage);
 
         this.homographyMat = homographyMat;
+        this.inverseHomographyMat = inverseHomographyMat;
+        this.translatedHomographyMat = translatedHomographyMat;
+
         cv.imshow('matchresultcanvas', resultImage);
         cv.imshow('matchinfocanvas', matchImage);
 
@@ -255,9 +294,9 @@ export default {
     async checkMatch() {
       console.log(this.$store.getters['worker/results/success']('result'));
     },
-    mapNewFrameOntoScreen: function (handResults) {
+    mapScreenLocationOntoFrame: function (handResults) {
       if (this.screenBaseImg) {
-        // this.manualMatch();
+        this.match(this.lastSeenInputImageData, this.screenBaseImgData);
       }
     },
     renderImages: function (handResults) {
@@ -288,20 +327,16 @@ export default {
           canvasToRenderCtx.stroke();
         }
       }
-      canvasToRenderCtx.restore();
 
       // Render the screen render canvas
       let screenCanvasCtxToRender = this.screenRenderCanvasCtx;
       let screenCanvasElementToRender = this.screenRenderCanvasElement;
 
-      screenCanvasElementToRender.width = this.baseScreenImgStitchedCanvasElement.width;
-      screenCanvasElementToRender.height = this.baseScreenImgStitchedCanvasElement.height;
-
       screenCanvasCtxToRender.save();
       screenCanvasCtxToRender.clearRect(0, 0, screenCanvasElementToRender.width, screenCanvasElementToRender.height);
       if (this.screenBaseImgLoaded) {
         // screenCanvasCtxToRender.drawImage(this.screenBaseImg, 0, 0, screenCanvasElementToRender.width, screenCanvasElementToRender.height);
-        screenCanvasCtxToRender.drawImage(this.baseScreenImgStitchedCanvasElement, 0, 0, screenCanvasElementToRender.width, screenCanvasElementToRender.height);
+        screenCanvasCtxToRender.drawImage(this.screenBaseImg, 0, 0, screenCanvasElementToRender.width, screenCanvasElementToRender.height);
       }
       // If we have a finger tip position, draw a circle on it
       if (this.fingerTipPosition) {
@@ -318,10 +353,26 @@ export default {
           screenCanvasCtxToRender.beginPath();
           screenCanvasCtxToRender.arc(this.fingerTipPosition.x, this.fingerTipPosition.y, 10, 0, 2 * Math.PI * this.selectProgress);
           screenCanvasCtxToRender.stroke();
+
+          // Repeat above for canvasToRenderCtx
+          canvasToRenderCtx.strokeStyle = "#FFFFFF";
+          canvasToRenderCtx.beginPath();
+          canvasToRenderCtx.arc(this.fingerTipPositionUnmapped.x, this.fingerTipPositionUnmapped.y, 10, 0, 2 * Math.PI);
+          canvasToRenderCtx.stroke();
+          // Fill in the circle based on the progress
+          canvasToRenderCtx.strokeStyle = "#00FF00";
+          canvasToRenderCtx.beginPath();
+          canvasToRenderCtx.arc(this.fingerTipPositionUnmapped.x, this.fingerTipPositionUnmapped.y, 10, 0, 2 * Math.PI * this.selectProgress);
+          canvasToRenderCtx.stroke();
         } else {
           screenCanvasCtxToRender.beginPath();
           screenCanvasCtxToRender.arc(this.fingerTipPosition.x, this.fingerTipPosition.y, 10, 0, 2 * Math.PI);
           screenCanvasCtxToRender.stroke();
+
+          // Repeat above for canvasToRenderCtx
+          canvasToRenderCtx.beginPath();
+          canvasToRenderCtx.arc(this.fingerTipPositionUnmapped.x, this.fingerTipPositionUnmapped.y, 10, 0, 2 * Math.PI);
+          canvasToRenderCtx.stroke();
         }
       }
       // If we have line data draw the bounding boxes
@@ -339,38 +390,63 @@ export default {
           screenCanvasCtxToRender.stroke();
         })
       }
+      // If we have the mapped line data draw the bounding boxes
+      if (this.mappedOCRBoxes) {
+        this.mappedOCRBoxes.forEach((line) => {
+          canvasToRenderCtx.beginPath();
+          let confidence = line.confidence;
+
+          // Set the stroke color from red to green based on confidence
+          let red = Math.floor(255.0 * (100 - confidence) / 100.0);
+          let green = Math.floor(255.0 * confidence / 100.0);
+          canvasToRenderCtx.strokeStyle = `rgb(${red},${green},0)`;
+
+          canvasToRenderCtx.rect(line.bbox.x0, line.bbox.y0, (line.bbox.x1 - line.bbox.x0), (line.bbox.y1 - line.bbox.y0));
+          canvasToRenderCtx.stroke();
+        })
+      }
 
       screenCanvasCtxToRender.restore();
+      canvasToRenderCtx.restore();
     },
     cameraProcessLoop: function (handResults) {
 
-      if (this.screenWidth == null && handResults.image) {
-        this.setScreenWidthandHeight(handResults.image.width, handResults.image.height);
+      let currentms = Date.now()
+
+      if (this.nextProcessms < currentms) {
+        this.nextProcessms = currentms + this.processPeriodms;
+
+        if (this.screenWidth == null && handResults.image) {
+          this.setScreenWidthandHeight(handResults.image.width, handResults.image.height);
+        }
+
+        // Set last seen input image
+        this.lastSeenInputImage = handResults.image;
+
+        // Get lastSeenInputImageData
+        this.lastSeenInputImageData = this.videoCanvasCtx.getImageData(0, 0, this.videoCanvasElement.width, this.videoCanvasElement.height);
+
+        // Map new frame onto identified screen
+        this.mapScreenLocationOntoFrame(handResults);
+
+        // Get finger tip position
+        this.fingerTipPositionUnmapped = this.getFingerTipPosition(handResults);
+
+        // Map positions to base screen
+        this.mapPositionsToBaseScreen();
+
+        // Handle finger tip selection
+        this.fingerTipSelectionHandler();
+
+        // Do screen processing to identify if screen stitching is needed
+        this.doScreenStitchingProcessing(handResults);
+
+        // Render any images
+        this.renderImages(handResults);
+
+      } else {
       }
 
-      // Set last seen input image
-      this.lastSeenInputImage = handResults.image;
-
-      // Get lastSeenInputImageData
-      this.lastSeenInputImageData = this.videoCanvasCtx.getImageData(0, 0, this.videoCanvasElement.width, this.videoCanvasElement.height);
-
-      // Map new frame onto identified screen
-      this.mapNewFrameOntoScreen(handResults);
-
-      // Get finger tip position
-      this.fingerTipPositionUnmapped = this.getFingerTipPosition(handResults);
-
-      // Get finger tip position mapped to base image
-      this.fingerTipPosition = this.mapFingerTipPositionToBaseImage(this.fingerTipPositionUnmapped);
-
-      // Handle finger tip selection
-      this.fingerTipSelectionHandler();
-
-      // Do screen processing to identify if screen stitching is needed
-      this.doScreenStitchingProcessing(handResults);
-
-      // Render any images
-      this.renderImages(handResults);
 
     },
     setScreenWidthandHeight: function (width, height) {
@@ -406,19 +482,19 @@ export default {
 
       const videoElement = document.getElementsByClassName('input_video')[0];
       this.videoCanvasElement = this.$refs.videocanvas;
-      this.videoCanvasCtx = this.videoCanvasElement.getContext('2d');
+      this.videoCanvasCtx = this.videoCanvasElement.getContext('2d', { willReadFrequently: true });
 
       this.renderCanvasElement = this.$refs.rendercanvas;
-      this.renderCanvasCtx = this.renderCanvasElement.getContext('2d');
+      this.renderCanvasCtx = this.renderCanvasElement.getContext('2d', { willReadFrequently: true });
 
-      this.screenRenderCanvasCtx = this.$refs.screenrendercanvas.getContext('2d');
+      this.screenRenderCanvasCtx = this.$refs.screenrendercanvas.getContext('2d', { willReadFrequently: true });
       this.screenRenderCanvasElement = this.$refs.screenrendercanvas;
 
       this.screenCanvasElement = this.$refs.screencanvas;
-      this.screenCanvasCtx = this.screenCanvasElement.getContext('2d');
+      this.screenCanvasCtx = this.screenCanvasElement.getContext('2d', { willReadFrequently: true });
 
       this.baseScreenImgStitchedCanvasElement = this.$refs.matchresultcanvas;
-      this.baseScreenImgStitchedCanvasCtx = this.baseScreenImgStitchedCanvasElement.getContext('2d');
+      this.baseScreenImgStitchedCanvasCtx = this.baseScreenImgStitchedCanvasElement.getContext('2d', { willReadFrequently: true });
 
       let onResults = function (results) {
         this.cameraProcessLoop(results);
