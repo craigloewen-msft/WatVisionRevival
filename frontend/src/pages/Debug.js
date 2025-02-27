@@ -28,63 +28,16 @@ function compareFeatures(img1Element, img2Element, outputCanvasElement) {
   orb.detectAndCompute(img2Gray, new cv.Mat(), keypoints2, descriptors2);
 
   // Match descriptors using BFMatcher with Hamming distance
-  let bf = new cv.BFMatcher(cv.NORM_HAMMING, true);
+  let bf = new cv.BFMatcher();
   let matches = new cv.DMatchVector();
   bf.match(descriptors1, descriptors2, matches);
 
   // Extract matched keypoints
   let goodMatches = new cv.DMatchVector();
-  let srcPoints = [];
-  let dstPoints = [];
 
-  for (let i = 0; i < matches.size(); i++) {
-    let match = matches.get(i);
-    let srcPt = keypoints1.get(match.queryIdx).pt;
-    let dstPt = keypoints2.get(match.trainIdx).pt;
-
-    srcPoints.push([srcPt.x, srcPt.y]); // Ensure (x, y) format
-    dstPoints.push([dstPt.x, dstPt.y]);
-  }
-
-  // Convert to OpenCV Mat
-  let srcMat = cv.matFromArray(srcPoints.length, 1, cv.CV_32FC2, srcPoints.flat());
-  let dstMat = cv.matFromArray(dstPoints.length, 1, cv.CV_32FC2, dstPoints.flat());
-
-  // Find Homography (perspective transformation)
-  let homography = cv.findHomography(srcMat, dstMat, cv.RANSAC);
-
-  let img2Corners = cv.matFromArray(4, 1, cv.CV_32FC2, [
-    0, 0, // Top-left
-    img2.cols, 0, // Top-right
-    img2.cols, img2.rows, // Bottom-right
-    0, img2.rows // Bottom-left
-  ]);
-
-  let transformedCorners = new cv.Mat();
-  cv.perspectiveTransform(img2Corners, transformedCorners, homography);
-
-
-  // Convert to array
-  let points = [];
-  for (let i = 0; i < 4; i++) {
-    points.push({
-      x: transformedCorners.data32F[i * 2],
-      y: transformedCorners.data32F[i * 2 + 1]
-    });
-  }
-
-  // Draw the transformed rectangle on img1
-  let img1WithBox = img1.clone();
-  let color = new cv.Scalar(0, 255, 0, 255); // Green color
-
-  cv.line(img1WithBox, points[0], points[1], color, 2); // Top
-  cv.line(img1WithBox, points[1], points[2], color, 2); // Right
-  cv.line(img1WithBox, points[2], points[3], color, 2); // Bottom
-  cv.line(img1WithBox, points[3], points[0], color, 2); // Left
-
-  // Show the result
-  cv.imshow(outputCanvasElement, img1WithBox);
-
+  let outImg = new cv.Mat();
+  cv.drawMatches(img1Gray, keypoints1, img2Gray, keypoints2, matches, outImg);
+  cv.imshow(outputCanvasElement, outImg);
 
   console.log("Done comparing features");
 
@@ -99,9 +52,9 @@ function compareFeatures(img1Element, img2Element, outputCanvasElement) {
   descriptors2.delete();
   matches.delete();
   goodMatches.delete();
-  srcMat.delete();
-  dstMat.delete();
-  homography.delete();
+  // srcMat.delete();
+  // dstMat.delete();
+  // homography.delete();
   // alignedImg2.delete();
   // blended.delete();
 }
