@@ -1,35 +1,48 @@
 {
-  "name": "watvisionrevival",
-  "version": "0.0.0",
-  "scripts": {
-    "dev": "vite --host",
-    "build": "vite build",
-    "preview": "vite preview --port 4173",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
-  },
+  "name": "watvisionrevivaltest",
+  "version": "0.1.0",
+  "private": true,
   "dependencies": {
-    "@mediapipe/camera_utils": "^0.3.1640029074",
-    "@mediapipe/control_utils": "^0.6.1629159505",
-    "@mediapipe/drawing_utils": "^0.3.1620248257",
-    "@mediapipe/hands": "^0.4.1646424915",
-    "@mediapipe/holistic": "^0.5.1635989137",
-    "axios": "^0.27.2",
-    "exif-js": "^2.3.0",
-    "file-saver": "^2.0.5",
-    "opencv.js": "^1.2.1",
-    "pinia": "^2.0.21",
-    "tesseract.js": "^3.0.3",
-    "vue": "^3.2.38",
-    "vue-router": "^4.1.5",
-    "vuex": "^4.0.2"
+    "@techstark/opencv-js": "^4.10.0-release.1",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.7.9",
+    "bootstrap": "^5.3.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-scripts": "5.0.1",
+    "tesseract.js": "^6.0.0",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "dev": "BROWSER=none react-app-rewired start",
+    "build": "react-app-rewired build",
+    "test": "react-app-rewired test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   },
   "devDependencies": {
-    "@rushstack/eslint-patch": "^1.1.4",
-    "@vitejs/plugin-vue": "^3.0.3",
-    "@vue/eslint-config-prettier": "^7.0.0",
-    "eslint": "^8.22.0",
-    "eslint-plugin-vue": "^9.3.0",
-    "prettier": "^2.7.1",
-    "vite": "^3.0.9"
-  }
+    "react-app-rewired": "^2.2.1",
+    "react-router-dom": "^7.2.0"
+  },
+  "proxy": "http://localhost:8080"
 }

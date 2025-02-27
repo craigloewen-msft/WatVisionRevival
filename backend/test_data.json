@@ -1,0 +1,1248 @@
+{
+  "version": "3.2.0",
+  "modelVersion": "2022-04-30",
+  "readResults": [
+    {
+      "page": 1,
+      "language": "en",
+      "angle": 4.9698,
+      "width": 1536,
+      "height": 2048,
+      "unit": "pixel",
+      "lines": [
+        {
+          "boundingBox": [
+            395,
+            39,
+            1057,
+            11,
+            1060,
+            117,
+            395,
+            139
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "Earn rewards",
+          "words": [
+            {
+              "boundingBox": [
+                396,
+                46,
+                604,
+                33,
+                604,
+                131,
+                396,
+                139
+              ],
+              "text": "Earn",
+              "confidence": 0.988
+            },
+            {
+              "boundingBox": [
+                625,
+                32,
+                1053,
+                11,
+                1054,
+                120,
+                626,
+                131
+              ],
+              "text": "rewards",
+              "confidence": 0.997
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            297,
+            171,
+            1177,
+            143,
+            1178,
+            204,
+            300,
+            236
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "on all your fave Macca's® orders*",
+          "words": [
+            {
+              "boundingBox": [
+                298,
+                173,
+                355,
+                171,
+                357,
+                235,
+                300,
+                236
+              ],
+              "text": "on",
+              "confidence": 0.998
+            },
+            {
+              "boundingBox": [
+                367,
+                170,
+                426,
+                167,
+                428,
+                233,
+                370,
+                234
+              ],
+              "text": "all",
+              "confidence": 0.998
+            },
+            {
+              "boundingBox": [
+                438,
+                167,
+                559,
+                162,
+                560,
+                229,
+                440,
+                233
+              ],
+              "text": "your",
+              "confidence": 0.98
+            },
+            {
+              "boundingBox": [
+                572,
+                162,
+                689,
+                157,
+                689,
+                224,
+                573,
+                228
+              ],
+              "text": "fave",
+              "confidence": 0.989
+            },
+            {
+              "boundingBox": [
+                701,
+                157,
+                951,
+                149,
+                950,
+                212,
+                701,
+                223
+              ],
+              "text": "Macca's®",
+              "confidence": 0.851
+            },
+            {
+              "boundingBox": [
+                964,
+                149,
+                1178,
+                144,
+                1175,
+                201,
+                962,
+                212
+              ],
+              "text": "orders*",
+              "confidence": 0.996
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            455,
+            355,
+            530,
+            328,
+            556,
+            402,
+            479,
+            428
+          ],
+          "appearance": {
+            "style": {
+              "name": "handwriting",
+              "confidence": 0.936
+            }
+          },
+          "text": "m",
+          "words": [
+            {
+              "boundingBox": [
+                474,
+                347,
+                523,
+                330,
+                549,
+                404,
+                500,
+                421
+              ],
+              "text": "m",
+              "confidence": 0.917
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            653,
+            412,
+            764,
+            410,
+            762,
+            462,
+            650,
+            457
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "My(Y)",
+          "words": [
+            {
+              "boundingBox": [
+                650,
+                410,
+                761,
+                410,
+                760,
+                462,
+                650,
+                460
+              ],
+              "text": "My(Y)",
+              "confidence": 0.692
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            640,
+            464,
+            786,
+            465,
+            786,
+            498,
+            639,
+            497
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "Rewards",
+          "words": [
+            {
+              "boundingBox": [
+                642,
+                464,
+                782,
+                465,
+                780,
+                499,
+                640,
+                496
+              ],
+              "text": "Rewards",
+              "confidence": 0.994
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            597,
+            528,
+            832,
+            530,
+            831,
+            604,
+            596,
+            602
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "Order.",
+          "words": [
+            {
+              "boundingBox": [
+                599,
+                528,
+                830,
+                533,
+                827,
+                604,
+                596,
+                603
+              ],
+              "text": "Order.",
+              "confidence": 0.996
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            412,
+            589,
+            481,
+            603,
+            467,
+            680,
+            398,
+            668
+          ],
+          "appearance": {
+            "style": {
+              "name": "handwriting",
+              "confidence": 0.764
+            }
+          },
+          "text": "m",
+          "words": [
+            {
+              "boundingBox": [
+                423,
+                591,
+                474,
+                601,
+                459,
+                679,
+                408,
+                670
+              ],
+              "text": "m",
+              "confidence": 0.754
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            595,
+            621,
+            787,
+            626,
+            785,
+            689,
+            595,
+            686
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "Earn.",
+          "words": [
+            {
+              "boundingBox": [
+                595,
+                621,
+                786,
+                625,
+                784,
+                690,
+                595,
+                686
+              ],
+              "text": "Earn.",
+              "confidence": 0.994
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            599,
+            704,
+            816,
+            711,
+            812,
+            793,
+            595,
+            788
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "Enjoy.",
+          "words": [
+            {
+              "boundingBox": [
+                597,
+                704,
+                815,
+                710,
+                813,
+                794,
+                595,
+                788
+              ],
+              "text": "Enjoy.",
+              "confidence": 0.978
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            509,
+            852,
+            567,
+            846,
+            570,
+            892,
+            516,
+            900
+          ],
+          "appearance": {
+            "style": {
+              "name": "handwriting",
+              "confidence": 0.636
+            }
+          },
+          "text": "M",
+          "words": [
+            {
+              "boundingBox": [
+                529,
+                850,
+                560,
+                846,
+                566,
+                893,
+                535,
+                897
+              ],
+              "text": "M",
+              "confidence": 0.961
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            366,
+            990,
+            660,
+            1008,
+            657,
+            1050,
+            364,
+            1031
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "Login using your",
+          "words": [
+            {
+              "boundingBox": [
+                367,
+                991,
+                459,
+                996,
+                457,
+                1038,
+                365,
+                1032
+              ],
+              "text": "Login",
+              "confidence": 0.998
+            },
+            {
+              "boundingBox": [
+                468,
+                997,
+                567,
+                1003,
+                564,
+                1045,
+                465,
+                1038
+              ],
+              "text": "using",
+              "confidence": 0.998
+            },
+            {
+              "boundingBox": [
+                575,
+                1003,
+                658,
+                1008,
+                655,
+                1051,
+                572,
+                1045
+              ],
+              "text": "your",
+              "confidence": 0.991
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            384,
+            1039,
+            645,
+            1057,
+            643,
+            1097,
+            382,
+            1078
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "MyMacca's app",
+          "words": [
+            {
+              "boundingBox": [
+                384,
+                1040,
+                567,
+                1052,
+                564,
+                1091,
+                382,
+                1080
+              ],
+              "text": "MyMacca's",
+              "confidence": 0.993
+            },
+            {
+              "boundingBox": [
+                575,
+                1053,
+                643,
+                1058,
+                640,
+                1097,
+                572,
+                1091
+              ],
+              "text": "app",
+              "confidence": 0.998
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            337,
+            1085,
+            696,
+            1103,
+            694,
+            1142,
+            334,
+            1120
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "one time code below",
+          "words": [
+            {
+              "boundingBox": [
+                337,
+                1085,
+                396,
+                1086,
+                394,
+                1124,
+                335,
+                1121
+              ],
+              "text": "one",
+              "confidence": 0.995
+            },
+            {
+              "boundingBox": [
+                403,
+                1087,
+                483,
+                1090,
+                480,
+                1128,
+                401,
+                1124
+              ],
+              "text": "time",
+              "confidence": 0.989
+            },
+            {
+              "boundingBox": [
+                490,
+                1091,
+                576,
+                1097,
+                574,
+                1134,
+                487,
+                1129
+              ],
+              "text": "code",
+              "confidence": 0.991
+            },
+            {
+              "boundingBox": [
+                583,
+                1097,
+                683,
+                1108,
+                680,
+                1142,
+                581,
+                1135
+              ],
+              "text": "below",
+              "confidence": 0.998
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            427,
+            1319,
+            600,
+            1334,
+            597,
+            1360,
+            425,
+            1345
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "Enter Code",
+          "words": [
+            {
+              "boundingBox": [
+                429,
+                1319,
+                511,
+                1327,
+                509,
+                1353,
+                427,
+                1346
+              ],
+              "text": "Enter",
+              "confidence": 0.998
+            },
+            {
+              "boundingBox": [
+                516,
+                1328,
+                594,
+                1335,
+                593,
+                1360,
+                514,
+                1354
+              ],
+              "text": "Code",
+              "confidence": 0.989
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            806,
+            1360,
+            979,
+            1377,
+            976,
+            1401,
+            803,
+            1383
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "Start Order",
+          "words": [
+            {
+              "boundingBox": [
+                809,
+                1360,
+                884,
+                1367,
+                880,
+                1390,
+                805,
+                1384
+              ],
+              "text": "Start",
+              "confidence": 0.998
+            },
+            {
+              "boundingBox": [
+                890,
+                1368,
+                977,
+                1379,
+                974,
+                1401,
+                887,
+                1391
+              ],
+              "text": "Order",
+              "confidence": 0.998
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            405,
+            1349,
+            623,
+            1370,
+            621,
+            1392,
+            403,
+            1369
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "from the MyMacca's app",
+          "words": [
+            {
+              "boundingBox": [
+                406,
+                1350,
+                442,
+                1353,
+                441,
+                1373,
+                405,
+                1370
+              ],
+              "text": "from",
+              "confidence": 0.987
+            },
+            {
+              "boundingBox": [
+                453,
+                1354,
+                482,
+                1356,
+                480,
+                1376,
+                452,
+                1373
+              ],
+              "text": "the",
+              "confidence": 0.998
+            },
+            {
+              "boundingBox": [
+                485,
+                1357,
+                583,
+                1367,
+                582,
+                1387,
+                484,
+                1376
+              ],
+              "text": "MyMacca's",
+              "confidence": 0.991
+            },
+            {
+              "boundingBox": [
+                587,
+                1368,
+                619,
+                1372,
+                618,
+                1391,
+                586,
+                1387
+              ],
+              "text": "app",
+              "confidence": 0.998
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            775,
+            1386,
+            1009,
+            1411,
+            1007,
+            1433,
+            772,
+            1407
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "Continue without sign in",
+          "words": [
+            {
+              "boundingBox": [
+                775,
+                1387,
+                861,
+                1395,
+                858,
+                1415,
+                773,
+                1407
+              ],
+              "text": "Continue",
+              "confidence": 0.996
+            },
+            {
+              "boundingBox": [
+                866,
+                1396,
+                941,
+                1404,
+                937,
+                1424,
+                863,
+                1415
+              ],
+              "text": "without",
+              "confidence": 0.997
+            },
+            {
+              "boundingBox": [
+                945,
+                1405,
+                984,
+                1410,
+                981,
+                1429,
+                941,
+                1424
+              ],
+              "text": "sign",
+              "confidence": 0.989
+            },
+            {
+              "boundingBox": [
+                990,
+                1411,
+                1006,
+                1413,
+                1003,
+                1433,
+                986,
+                1430
+              ],
+              "text": "in",
+              "confidence": 0.998
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            469,
+            1437,
+            564,
+            1445,
+            562,
+            1474,
+            468,
+            1465
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "1234",
+          "words": [
+            {
+              "boundingBox": [
+                470,
+                1438,
+                555,
+                1445,
+                551,
+                1474,
+                468,
+                1466
+              ],
+              "text": "1234",
+              "confidence": 0.998
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            871,
+            1507,
+            955,
+            1516,
+            953,
+            1531,
+            870,
+            1520
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "Accessibility",
+          "words": [
+            {
+              "boundingBox": [
+                873,
+                1507,
+                953,
+                1518,
+                952,
+                1531,
+                873,
+                1522
+              ],
+              "text": "Accessibility",
+              "confidence": 0.992
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            708,
+            1547,
+            919,
+            1575,
+            918,
+            1587,
+            707,
+            1559
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "The average adult daily energy intake is 8,700kJ.",
+          "words": [
+            {
+              "boundingBox": [
+                709,
+                1548,
+                724,
+                1550,
+                723,
+                1561,
+                708,
+                1560
+              ],
+              "text": "The",
+              "confidence": 0.998
+            },
+            {
+              "boundingBox": [
+                726,
+                1550,
+                761,
+                1555,
+                760,
+                1565,
+                725,
+                1561
+              ],
+              "text": "average",
+              "confidence": 0.939
+            },
+            {
+              "boundingBox": [
+                763,
+                1555,
+                786,
+                1558,
+                784,
+                1568,
+                762,
+                1566
+              ],
+              "text": "adult",
+              "confidence": 0.96
+            },
+            {
+              "boundingBox": [
+                788,
+                1558,
+                808,
+                1561,
+                807,
+                1571,
+                786,
+                1569
+              ],
+              "text": "daily",
+              "confidence": 0.955
+            },
+            {
+              "boundingBox": [
+                810,
+                1561,
+                840,
+                1565,
+                839,
+                1576,
+                809,
+                1572
+              ],
+              "text": "energy",
+              "confidence": 0.911
+            },
+            {
+              "boundingBox": [
+                842,
+                1566,
+                870,
+                1569,
+                869,
+                1580,
+                841,
+                1576
+              ],
+              "text": "intake",
+              "confidence": 0.995
+            },
+            {
+              "boundingBox": [
+                873,
+                1570,
+                880,
+                1571,
+                878,
+                1581,
+                871,
+                1580
+              ],
+              "text": "is",
+              "confidence": 0.646
+            },
+            {
+              "boundingBox": [
+                882,
+                1571,
+                920,
+                1576,
+                918,
+                1587,
+                880,
+                1581
+              ],
+              "text": "8,700kJ.",
+              "confidence": 0.664
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            505,
+            1555,
+            528,
+            1558,
+            527,
+            1571,
+            504,
+            1569
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.726
+            }
+          },
+          "text": "V",
+          "words": [
+            {
+              "boundingBox": [
+                518,
+                1556,
+                527,
+                1557,
+                526,
+                1571,
+                517,
+                1570
+              ],
+              "text": "V",
+              "confidence": 0.919
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            599,
+            1926,
+            623,
+            1931,
+            621,
+            1945,
+            595,
+            1941
+          ],
+          "appearance": {
+            "style": {
+              "name": "handwriting",
+              "confidence": 0.723
+            }
+          },
+          "text": "m",
+          "words": [
+            {
+              "boundingBox": [
+                604,
+                1926,
+                614,
+                1928,
+                611,
+                1944,
+                601,
+                1942
+              ],
+              "text": "m",
+              "confidence": 0.944
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            564,
+            1962,
+            638,
+            1976,
+            636,
+            1986,
+            562,
+            1972
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "De Contactiand",
+          "words": [
+            {
+              "boundingBox": [
+                566,
+                1962,
+                577,
+                1964,
+                574,
+                1974,
+                563,
+                1972
+              ],
+              "text": "De",
+              "confidence": 0.028
+            },
+            {
+              "boundingBox": [
+                579,
+                1965,
+                633,
+                1975,
+                630,
+                1985,
+                576,
+                1974
+              ],
+              "text": "Contactiand",
+              "confidence": 0.363
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            522,
+            2013,
+            576,
+            2018,
+            574,
+            2031,
+            522,
+            2026
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "Lane/3000",
+          "words": [
+            {
+              "boundingBox": [
+                523,
+                2014,
+                574,
+                2018,
+                572,
+                2031,
+                523,
+                2027
+              ],
+              "text": "Lane/3000",
+              "confidence": 0.981
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
