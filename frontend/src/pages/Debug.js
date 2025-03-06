@@ -35,10 +35,52 @@ function compareFeatures(img1Element, img2Element, outputCanvasElement) {
   // Extract matched keypoints
   let goodMatches = new cv.DMatchVector();
 
-  let outImg = new cv.Mat();
-  cv.drawMatches(img1Gray, keypoints1, img2Gray, keypoints2, matches, outImg);
-  cv.imshow(outputCanvasElement, outImg);
+  // Sort matches by distance and only take top 10
+  let topMatchesCount = 30;
 
+  let matchesArray = [];
+  for (let i = 0; i < matches.size(); i++) {
+    matchesArray.push(matches.get(i));
+  }
+
+  matchesArray.sort((a, b) => a.distance - b.distance);
+  for (let i = 0; i < topMatchesCount; i++) {
+    goodMatches.push_back(matchesArray[i]);
+  }
+
+
+  // Get key points from good matches
+  let srcPointsArray = [];
+  let dstPointsArray = [];
+  for (let i = 0; i < goodMatches.size(); i++) {
+    srcPointsArray.push(keypoints1.get(goodMatches.get(i).queryIdx).pt.x);
+    srcPointsArray.push(keypoints1.get(goodMatches.get(i).queryIdx).pt.y);
+    dstPointsArray.push(keypoints2.get(goodMatches.get(i).trainIdx).pt.x);
+    dstPointsArray.push(keypoints2.get(goodMatches.get(i).trainIdx).pt.y);
+  }
+
+  // Find homography
+  let srcMat = cv.matFromArray(goodMatches.size(), 2, cv.CV_32F, srcPointsArray);
+  let dstMat = cv.matFromArray(goodMatches.size(), 2, cv.CV_32F, dstPointsArray);
+  let homography = cv.findHomography(dstMat, srcMat, cv.RANSAC, 5);
+
+  let { width, height } = img2.size();
+  let cornerPts = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, width, 0, width, height, 0, height]);
+  let alignedCorners = new cv.Mat();
+  cv.perspectiveTransform(cornerPts, alignedCorners, homography);
+
+  // Convert alignedCorners to integer points
+  let alignedCornersInt = new cv.Mat();
+  alignedCorners.convertTo(alignedCornersInt, cv.CV_32SC2);
+
+  // Create a MatVector and push the aligned corners
+  let alignedCornersMatVector = new cv.MatVector();
+  alignedCornersMatVector.push_back(alignedCornersInt);
+  cv.polylines(img1, alignedCornersMatVector, true, [0, 255, 0, 255], 2);
+
+  let outImg = new cv.Mat();
+  cv.drawMatches(img1, keypoints1, img2Gray, keypoints2, goodMatches, outImg);
+  cv.imshow(outputCanvasElement, outImg);
   console.log("Done comparing features");
 
   // Cleanup
@@ -187,11 +229,11 @@ function Debug() {
       </div>
       <div className="row">
         <div className="col-6">
-          <img ref={imageRef} src="/walmart_touchscreen1.png" className="img-fluid" alt="Touchscreen" />
+          <img ref={imageRef} src="/walmart_touchscreen2.png" className="img-fluid" alt="Touchscreen" />
           <canvas ref={canvasRef} />
         </div>
         <div className="col-6">
-          <img ref={compareRef} src="/walmart_touchscreen_rotated.png" className="img-fluid" alt="Touchscreen" />
+          <img ref={compareRef} src="/walmart_touchscreen1.png" className="img-fluid" alt="Touchscreen" />
         </div>
       </div>
       <div className="row">
