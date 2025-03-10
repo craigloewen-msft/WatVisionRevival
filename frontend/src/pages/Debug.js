@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import cv from "@techstark/opencv-js";
 import axios from "axios";
 
-function compareFeatures(img1Element, img2Element, outputCanvasElement) {
-  if (!img1Element || !img2Element || !outputCanvasElement) return;
+function compareFeatures(img1Element, img2Element, debugCanvasElement) {
+  if (!img1Element || !img2Element || !debugCanvasElement) return;
 
   console.log("Starting compare features");
 
@@ -48,7 +48,6 @@ function compareFeatures(img1Element, img2Element, outputCanvasElement) {
     goodMatches.push_back(matchesArray[i]);
   }
 
-
   // Get key points from good matches
   let srcPointsArray = [];
   let dstPointsArray = [];
@@ -78,14 +77,14 @@ function compareFeatures(img1Element, img2Element, outputCanvasElement) {
   alignedCornersMatVector.push_back(alignedCornersInt);
   cv.polylines(img1, alignedCornersMatVector, true, [0, 255, 0, 255], 2);
 
-  let outImg = new cv.Mat();
-  cv.drawMatches(img1, keypoints1, img2Gray, keypoints2, goodMatches, outImg);
-  cv.imshow(outputCanvasElement, outImg);
+  cv.imshow(debugCanvasElement, img1);
+
+  // let matchedImage = new cv.Mat();
+  // cv.drawMatches(img1, keypoints1, img2Gray, keypoints2, goodMatches, matchedImage);
+  // cv.imshow(debugCanvasElement, matchedImage);
   console.log("Done comparing features");
 
   // Cleanup
-  img1.delete();
-  img2.delete();
   img1Gray.delete();
   img2Gray.delete();
   keypoints1.delete();
@@ -94,20 +93,58 @@ function compareFeatures(img1Element, img2Element, outputCanvasElement) {
   descriptors2.delete();
   matches.delete();
   goodMatches.delete();
-  // srcMat.delete();
-  // dstMat.delete();
-  // homography.delete();
-  // alignedImg2.delete();
-  // blended.delete();
+
+  return homography;
 }
 
+async function identifyImageTextData(imageElement) {
+  const imgSrcResponse = await fetch(imageElement.current.src);
+  const imgBlob = await imgSrcResponse.blob();
+
+  const formData = new FormData();
+  formData.append("image", imgBlob, "image.png");
+
+  const response = await axios.post("/api/vision/", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.data;
+}
+
+function drawImageTextData(imageElement, imageTextData) {
+  const src = cv.imread(imageElement);
+  imageTextData.readResults.forEach((readResult) => {
+    readResult.lines.forEach((line) => {
+      // boundingBox is an array
+      let [x0, y0, x1, y1, x2, y2, x3, y3] = line.boundingBox;
+
+      let scale = 0.288;
+      x0 = x0 * scale;
+      y0 = y0 * scale;
+      x1 = x1 * scale;
+      y1 = y1 * scale;
+      x2 = x2 * scale;
+      y2 = y2 * scale;
+      x3 = x3 * scale;
+      y3 = y3 * scale;
+
+      cv.line(src, new cv.Point(x0, y0), new cv.Point(x1, y1), [255, 0, 0, 255], 2);
+      cv.line(src, new cv.Point(x1, y1), new cv.Point(x2, y2), [255, 0, 0, 255], 2);
+      cv.line(src, new cv.Point(x2, y2), new cv.Point(x3, y3), [255, 0, 0, 255], 2);
+      cv.line(src, new cv.Point(x3, y3), new cv.Point(x0, y0), [255, 0, 0, 255], 2);
+
+    });
+  });
+  cv.imshow(imageElement, src); // Original image
+  src.delete();
+}
 
 function Debug() {
   const imageRef = useRef(null);
-  const canvasRef = useRef(null);
-
   const compareRef = useRef(null);
-  const finalComparisonRef = useRef(null);
+  const debugImageRef = useRef(null);
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -132,76 +169,35 @@ function Debug() {
     }
 
     async function processImage() {
-      const imgElement = imageRef.current;
-      const canvasElement = canvasRef.current;
+      const currentImageElement = imageRef.current;
       const compareElement = compareRef.current;
-      if (!imgElement || !canvasElement || !compareElement) return;
+      const debugImageElement = debugImageRef.current;
+      if (!currentImageElement || !debugImageElement || !compareElement) return;
 
-      compareFeatures(imgElement, compareElement, finalComparisonRef.current);
-
-      const imgSrcResponse = await fetch(imageRef.current.src);
-      const imgBlob = await imgSrcResponse.blob();
-
-      const formData = new FormData();
-      formData.append("image", imgBlob, "image.png");
-
-      const src = cv.imread(imgElement);
 
       try {
-        console.log("Calling API");
-        const response = await axios.post("/api/vision/", formData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        });
-        console.log("Vision API response:", response.data);
+        // Compare features between the two 
+        let homography = compareFeatures(currentImageElement, compareElement, debugImageElement);
 
-        if (!response.data.success) {
-          throw new Error("API call failed: " + response.data.error);
+        console.log("Calling API");
+        const imageTextDataResponse = await identifyImageTextData(compareRef);
+
+        if (!imageTextDataResponse.success) {
+          throw new Error("API call failed: " + imageTextDataResponse.data.error);
         }
+
+        console.log("Vision API response:", imageTextDataResponse.data);
+        const imageTextData = imageTextDataResponse.data;
 
         setData("Success");
 
-        response.data.result.readResults.forEach((readResult) => {
-          readResult.lines.forEach((line) => {
-            // boundingBox is an array
-            let [x0, y0, x1, y1, x2, y2, x3, y3] = line.boundingBox;
-
-            let scale = 0.288;
-            x0 = x0 * scale;
-            y0 = y0 * scale;
-            x1 = x1 * scale;
-            y1 = y1 * scale;
-            x2 = x2 * scale;
-            y2 = y2 * scale;
-            x3 = x3 * scale;
-            y3 = y3 * scale;
-
-            cv.line(src, new cv.Point(x0, y0), new cv.Point(x1, y1), [255, 0, 0, 255], 2);
-            cv.line(src, new cv.Point(x1, y1), new cv.Point(x2, y2), [255, 0, 0, 255], 2);
-            cv.line(src, new cv.Point(x2, y2), new cv.Point(x3, y3), [255, 0, 0, 255], 2);
-            cv.line(src, new cv.Point(x3, y3), new cv.Point(x0, y0), [255, 0, 0, 255], 2);
-
-          });
-        });
-
-        // ret.data.blocks.forEach(block => {
-        //   const { x0, y0, x1, y1 } = block.bbox;
-        //   cv.rectangle(src, new cv.Point(x0, y0), new cv.Point(x1, y1), [255, 0, 0, 255], 2);
-        // });
-
-        // Show results
-        cv.imshow(canvasElement, src); // Original image
-
+        drawImageTextData(debugImageElement, imageTextData);
       } catch (err) {
-        console.error("Error calling Vision API:", err);
+        console.error(err);
         setError(err);
       }
 
       setLoading(false);
-
-      // Cleanup
-      src.delete();
     }
 
     const imgElement = imageRef.current;
@@ -230,14 +226,15 @@ function Debug() {
       <div className="row">
         <div className="col-6">
           <img ref={imageRef} src="/walmart_touchscreen2.png" className="img-fluid" alt="Touchscreen" />
-          <canvas ref={canvasRef} />
         </div>
         <div className="col-6">
           <img ref={compareRef} src="/walmart_touchscreen1.png" className="img-fluid" alt="Touchscreen" />
         </div>
       </div>
       <div className="row">
-        <canvas ref={finalComparisonRef} />
+        <div className="col-6">
+          <canvas ref={debugImageRef} />
+        </div>
       </div>
     </div>
   );

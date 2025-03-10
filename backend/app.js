@@ -26,7 +26,7 @@ const visionManager = new VisionManager();
 async function tryCatchResult(res, inputFunction) {
     try {
         let result = await inputFunction();
-        res.json({ success: true, result: result });
+        res.json({ success: true, data: result });
     } catch (error) {
         console.error('Error:', error);
         res.json({ success: false, error: error });
