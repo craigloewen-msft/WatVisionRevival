@@ -7,7 +7,7 @@ const stream = require('stream');
 const fs = require('fs');
 const path = require('path');
 
-const dataPath = path.join(__dirname, 'test_data.json');
+const dataPath = path.join(__dirname, 'test_data_walmart.json');
 const rawData = fs.readFileSync(dataPath);
 const testData = JSON.parse(rawData);
 
@@ -42,6 +42,8 @@ class VisionManager {
         //     let operation = result.operationLocation.split('/').slice(-1)[0];
 
         //     while (result.status !== "succeeded") { await sleep(1000); result = await this.computerVisionClient.getReadResult(operation); }
+
+        //     return result;
 
         //     console.log(result.analyzeResult);
 

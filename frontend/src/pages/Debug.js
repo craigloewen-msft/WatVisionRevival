@@ -113,14 +113,33 @@ async function identifyImageTextData(imageElement) {
   return response.data;
 }
 
+function copyImage(srcElement, destElement) {
+  const src = cv.imread(srcElement);
+  cv.imshow(destElement, src);
+  src.delete();
+}
+
 function drawImageTextData(imageElement, imageTextData) {
   const src = cv.imread(imageElement);
+
+  // Get original image size from imageTextData.readResults.width and height
+  let { width, height } = imageTextData.readResults[0];
+
+  // Get ratio of original image size to displayed image size
+  let horizontal_ratio = src.cols / width;
+  let vertical_ratio = src.rows / height;
+
+  // If ratios are not within 5% of eachother show a warn
+  if (Math.abs(horizontal_ratio - vertical_ratio) > 0.05) {
+    console.warn("Image size ratios are not within 5% of each other");
+  }
+
   imageTextData.readResults.forEach((readResult) => {
     readResult.lines.forEach((line) => {
       // boundingBox is an array
       let [x0, y0, x1, y1, x2, y2, x3, y3] = line.boundingBox;
 
-      let scale = 0.288;
+      let scale = horizontal_ratio;
       x0 = x0 * scale;
       y0 = y0 * scale;
       x1 = x1 * scale;
@@ -144,7 +163,8 @@ function drawImageTextData(imageElement, imageTextData) {
 function Debug() {
   const imageRef = useRef(null);
   const compareRef = useRef(null);
-  const debugImageRef = useRef(null);
+  const debugInputImageRef = useRef(null);
+  const debugReferenceImageRef = useRef(null);
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -171,13 +191,14 @@ function Debug() {
     async function processImage() {
       const currentImageElement = imageRef.current;
       const compareElement = compareRef.current;
-      const debugImageElement = debugImageRef.current;
-      if (!currentImageElement || !debugImageElement || !compareElement) return;
+      const debugInputImageElement = debugInputImageRef.current;
+      const debugReferenceImageElement = debugReferenceImageRef.current;
+      if (!currentImageElement || !debugInputImageElement || !compareElement) return;
 
 
       try {
         // Compare features between the two 
-        let homography = compareFeatures(currentImageElement, compareElement, debugImageElement);
+        let homography = compareFeatures(currentImageElement, compareElement, debugInputImageElement);
 
         console.log("Calling API");
         const imageTextDataResponse = await identifyImageTextData(compareRef);
@@ -191,7 +212,8 @@ function Debug() {
 
         setData("Success");
 
-        drawImageTextData(debugImageElement, imageTextData);
+        copyImage(compareElement, debugReferenceImageElement);
+        drawImageTextData(debugReferenceImageElement, imageTextData);
       } catch (err) {
         console.error(err);
         setError(err);
@@ -225,15 +247,22 @@ function Debug() {
       </div>
       <div className="row">
         <div className="col-6">
+          <h3>Input image</h3>
           <img ref={imageRef} src="/walmart_touchscreen2.png" className="img-fluid" alt="Touchscreen" />
         </div>
         <div className="col-6">
+          <h3>Source reference image</h3>
           <img ref={compareRef} src="/walmart_touchscreen1.png" className="img-fluid" alt="Touchscreen" />
         </div>
       </div>
       <div className="row">
         <div className="col-6">
-          <canvas ref={debugImageRef} />
+          <h3>Debug input image</h3>
+          <canvas ref={debugInputImageRef} />
+        </div>
+        <div className="col-6">
+          <h3>Debug source image</h3>
+          <canvas ref={debugReferenceImageRef} />
         </div>
       </div>
     </div>
