@@ -3,8 +3,8 @@ import axios from "axios";
 import {
     HandLandmarker,
     FilesetResolver,
-    HAND_CONNECTIONS
 } from "@mediapipe/tasks-vision";
+import { HAND_CONNECTIONS } from "@mediapipe/hands";
 
 import {
     drawConnectors, drawLandmarks
@@ -63,29 +63,27 @@ class WatVision {
         console.log("Detecting hands");
         const handLandmarkerResult = this.handLandmarker.detect(inputImageElement);
 
-        console.log(handLandmarkerResult.handednesses[0][0]);
-        const canvas = document.createElement("canvas");
-        canvas.setAttribute("class", "canvas");
-        canvas.setAttribute("width", inputImageElement.naturalWidth + "px");
-        canvas.setAttribute("height", inputImageElement.naturalHeight + "px");
-        canvas.style =
-            "left: 0px;" +
-            "top: 0px;" +
-            "width: " +
-            inputImageElement.width +
-            "px;" +
-            "height: " +
-            inputImageElement.height +
-            "px;";
+        if (handLandmarkerResult.landmarks.length > 0) {
+            let src = cv.imread(inputImageElement);
 
-        inputImageElement.parentNode.appendChild(canvas);
-        const cxt = canvas.getContext("2d");
-        for (const landmarks of handLandmarkerResult.landmarks) {
-            drawConnectors(cxt, landmarks, HAND_CONNECTIONS, {
-                color: "#00FF00",
-                lineWidth: 5
+            handLandmarkerResult.landmarks.forEach((landmarks) => {
+                for (let i = 0; i < landmarks.length; i++) {
+                    let x = landmarks[i].x * src.cols;
+                    let y = landmarks[i].y * src.rows;
+                    cv.circle(src, new cv.Point(x, y), 5, [0, 0, 255, 255], -1);
+                }
+
+                HAND_CONNECTIONS.forEach(([startIdx, endIdx]) => {
+                    let startX = landmarks[startIdx].x * src.cols;
+                    let startY = landmarks[startIdx].y * src.rows;
+                    let endX = landmarks[endIdx].x * src.cols;
+                    let endY = landmarks[endIdx].y * src.rows;
+                    cv.line(src, new cv.Point(startX, startY), new cv.Point(endX, endY), [0, 255, 0, 255], 2);
+                });
             });
-            drawLandmarks(cxt, landmarks, { color: "#FF0000", lineWidth: 1 });
+
+            cv.imshow(inputImageElement, src);
+            src.delete();
         }
 
         return true;

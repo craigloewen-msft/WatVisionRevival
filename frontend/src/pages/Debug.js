@@ -76,7 +76,8 @@ function Debug() {
   }, [watVision]);
 
   const handleButtonClick = () => {
-    const imgElement = imageRef.current;
+    const imgElement = debugInputImageRef.current;
+    // const imgElement = imageRef.current;
     if (imgElement) {
       watVision.detectHands(imgElement);
     }
@@ -100,17 +101,17 @@ function Debug() {
       <div className="row">
         <div className="col-6">
           <h3>Input image</h3>
-          <img ref={imageRef} onClick={handleButtonClick} src="/walmart_touchscreen2.png" className="img-fluid" alt="Touchscreen" />
+          <img ref={imageRef} src="/screen_test_compare.jpg" className="img-fluid" alt="Touchscreen" />
         </div>
         <div className="col-6">
           <h3>Source reference image</h3>
-          <img ref={compareRef} src="/walmart_touchscreen1.png" className="img-fluid" alt="Touchscreen" />
+          <img ref={compareRef} src="/screen_test_source.png" className="img-fluid" alt="Touchscreen" />
         </div>
       </div>
       <div className="row">
         <div className="col-6">
           <h3>Debug input image</h3>
-          <canvas ref={debugInputImageRef} />
+          <canvas onClick={handleButtonClick} ref={debugInputImageRef} />
         </div>
         <div className="col-6">
           <h3>Debug source image</h3>
