@@ -206,15 +206,16 @@ class WatVision {
         src.delete();
     }
 
-    drawImageTextData(imageElement, imageTextData) {
-        const src = cv.imread(imageElement);
+    drawImageTextData(inputImageElement, compareImageElement, imageTextData, homography) {
+        const compareSrc = cv.imread(compareImageElement);
+        const inputSrc = cv.imread(inputImageElement);
 
         // Get original image size from imageTextData.readResults.width and height
         let { width, height } = imageTextData.readResults[0];
 
         // Get ratio of original image size to displayed image size
-        let horizontal_ratio = src.cols / width;
-        let vertical_ratio = src.rows / height;
+        let horizontal_ratio = compareSrc.cols / width;
+        let vertical_ratio = compareSrc.rows / height;
 
         // If ratios are not within 5% of eachother show a warn
         if (Math.abs(horizontal_ratio - vertical_ratio) > 0.05) {
@@ -236,15 +237,32 @@ class WatVision {
                 x3 = x3 * scale;
                 y3 = y3 * scale;
 
-                cv.line(src, new cv.Point(x0, y0), new cv.Point(x1, y1), [255, 0, 0, 255], 2);
-                cv.line(src, new cv.Point(x1, y1), new cv.Point(x2, y2), [255, 0, 0, 255], 2);
-                cv.line(src, new cv.Point(x2, y2), new cv.Point(x3, y3), [255, 0, 0, 255], 2);
-                cv.line(src, new cv.Point(x3, y3), new cv.Point(x0, y0), [255, 0, 0, 255], 2);
+                cv.line(compareSrc, new cv.Point(x0, y0), new cv.Point(x1, y1), [0, 0, 255, 255], 2);
+                cv.line(compareSrc, new cv.Point(x1, y1), new cv.Point(x2, y2), [0, 0, 255, 255], 2);
+                cv.line(compareSrc, new cv.Point(x2, y2), new cv.Point(x3, y3), [0, 0, 255, 255], 2);
+                cv.line(compareSrc, new cv.Point(x3, y3), new cv.Point(x0, y0), [0, 0, 255, 255], 2);
+
+                
+                let boxPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [x0, y0, x1, y1, x2, y2, x3, y3]);
+                let alignedBox = new cv.Mat();
+                cv.perspectiveTransform(boxPoints, alignedBox, homography);
+
+                // Convert alignedBox to integer points
+                let alignedBoxInt = new cv.Mat();
+                alignedBox.convertTo(alignedBoxInt, cv.CV_32SC2);
+
+                // Create a MatVector and push the aligned corners
+                let alignedBoxMatVector = new cv.MatVector();
+                alignedBoxMatVector.push_back(alignedBoxInt);
+                cv.polylines(inputSrc, alignedBoxMatVector, true, [0, 0, 255, 255], 2);
 
             });
         });
-        cv.imshow(imageElement, src); // Original image
-        src.delete();
+
+        cv.imshow(inputImageElement, inputSrc); // Original image
+        cv.imshow(compareImageElement, compareSrc); // Original image
+        compareSrc.delete();
+        inputSrc.delete();
     }
 }
 

@@ -1,0 +1,275 @@
+{
+  "version": "3.2.0",
+  "modelVersion": "2022-04-30",
+  "readResults": [
+    {
+      "page": 1,
+      "language": "en",
+      "angle": 0.6945,
+      "width": 3024,
+      "height": 4032,
+      "unit": "pixel",
+      "lines": [
+        {
+          "boundingBox": [
+            1314,
+            1088,
+            1347,
+            1085,
+            1349,
+            1099,
+            1315,
+            1103
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.769
+            }
+          },
+          "text": "0",
+          "words": [
+            {
+              "boundingBox": [
+                1321,
+                1087,
+                1331,
+                1086,
+                1333,
+                1101,
+                1323,
+                1102
+              ],
+              "text": "0",
+              "confidence": 0.239
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            1382,
+            1084,
+            1468,
+            1081,
+            1468,
+            1100,
+            1382,
+            1103
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "figma.com",
+          "words": [
+            {
+              "boundingBox": [
+                1386,
+                1084,
+                1461,
+                1082,
+                1461,
+                1101,
+                1386,
+                1104
+              ],
+              "text": "figma.com",
+              "confidence": 0.941
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            1791,
+            1535,
+            2075,
+            1532,
+            2079,
+            1652,
+            1786,
+            1648
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "CAT",
+          "words": [
+            {
+              "boundingBox": [
+                1786,
+                1532,
+                2062,
+                1532,
+                2062,
+                1652,
+                1786,
+                1652
+              ],
+              "text": "CAT",
+              "confidence": 0.998
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            612,
+            2025,
+            940,
+            2029,
+            941,
+            2140,
+            609,
+            2136
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "DOG",
+          "words": [
+            {
+              "boundingBox": [
+                610,
+                2025,
+                887,
+                2028,
+                886,
+                2139,
+                609,
+                2136
+              ],
+              "text": "DOG",
+              "confidence": 0.997
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            2000,
+            2385,
+            2551,
+            2392,
+            2550,
+            2514,
+            1999,
+            2507
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "MOUSE",
+          "words": [
+            {
+              "boundingBox": [
+                2006,
+                2386,
+                2513,
+                2395,
+                2513,
+                2515,
+                1999,
+                2509
+              ],
+              "text": "MOUSE",
+              "confidence": 0.994
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            2880,
+            2950,
+            2990,
+            2953,
+            2989,
+            2973,
+            2880,
+            2972
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "16 ENG",
+          "words": [
+            {
+              "boundingBox": [
+                2881,
+                2951,
+                2917,
+                2952,
+                2918,
+                2973,
+                2882,
+                2973
+              ],
+              "text": "16",
+              "confidence": 0.02
+            },
+            {
+              "boundingBox": [
+                2950,
+                2954,
+                2985,
+                2955,
+                2985,
+                2973,
+                2950,
+                2973
+              ],
+              "text": "ENG",
+              "confidence": 0.998
+            }
+          ]
+        },
+        {
+          "boundingBox": [
+            1346,
+            3016,
+            1578,
+            3022,
+            1577,
+            3060,
+            1346,
+            3053
+          ],
+          "appearance": {
+            "style": {
+              "name": "other",
+              "confidence": 0.972
+            }
+          },
+          "text": "SAMSUNG",
+          "words": [
+            {
+              "boundingBox": [
+                1348,
+                3016,
+                1569,
+                3023,
+                1566,
+                3060,
+                1350,
+                3054
+              ],
+              "text": "SAMSUNG",
+              "confidence": 0.996
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

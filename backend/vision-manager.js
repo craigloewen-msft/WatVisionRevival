@@ -7,7 +7,7 @@ const stream = require('stream');
 const fs = require('fs');
 const path = require('path');
 
-const dataPath = path.join(__dirname, 'test_data_walmart.json');
+const dataPath = path.join(__dirname, 'test_data_screen.json');
 const rawData = fs.readFileSync(dataPath);
 const testData = JSON.parse(rawData);
 

@@ -58,7 +58,7 @@ function Debug() {
         setData("Success");
 
         watVision.copyImage(compareElement, debugReferenceImageElement);
-        watVision.drawImageTextData(debugReferenceImageElement, imageTextData);
+        watVision.drawImageTextData(debugInputImageElement, debugReferenceImageElement, imageTextData, homography);
       } catch (err) {
         console.error(err);
         setError(err);
@@ -105,7 +105,7 @@ function Debug() {
         </div>
         <div className="col-6">
           <h3>Source reference image</h3>
-          <img ref={compareRef} src="/screen_test_source.png" className="img-fluid" alt="Touchscreen" />
+          <img ref={compareRef} src="/screen_test_source.jpg" className="img-fluid" alt="Touchscreen" />
         </div>
       </div>
       <div className="row">
