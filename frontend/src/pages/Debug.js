@@ -43,22 +43,10 @@ function Debug() {
       try {
         // Compare features between the two 
         // watVision.detectHands(currentImageElement);
-        let homography = watVision.compareFeatures(currentImageElement, compareElement, debugInputImageElement);
 
-        console.log("Calling API");
-        const imageTextDataResponse = await watVision.identifyImageTextData(compareRef);
+        await watVision.captureSourceImage(compareElement);
 
-        if (!imageTextDataResponse.success) {
-          throw new Error("API call failed: " + imageTextDataResponse.data.error);
-        }
-
-        console.log("Vision API response:", imageTextDataResponse.data);
-        const imageTextData = imageTextDataResponse.data;
-
-        setData("Success");
-
-        watVision.copyImage(compareElement, debugReferenceImageElement);
-        watVision.drawImageTextData(debugInputImageElement, debugReferenceImageElement, imageTextData, homography);
+        watVision.step(currentImageElement, debugInputImageElement, debugReferenceImageElement);
       } catch (err) {
         console.error(err);
         setError(err);

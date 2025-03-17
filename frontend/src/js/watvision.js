@@ -6,16 +6,20 @@ import {
 } from "@mediapipe/tasks-vision";
 import { HAND_CONNECTIONS } from "@mediapipe/hands";
 
-import {
-    drawConnectors, drawLandmarks
-} from "@mediapipe/drawing_utils";
-
 class WatVision {
 
     constructor() {
         this.vision = null;
         this.handLandmarker = null;
         this.initiating = false;
+
+        this.inputImageMat = null;
+        this.sourceImageMat = null;
+
+        this.sourceTextInfo = null;
+
+        this.inputImageDebugMat = null;
+        this.sourceImageDebugMat = null;
     }
 
     async initVision() {
@@ -59,12 +63,47 @@ class WatVision {
         return true;
     }
 
-    async detectHands(inputImageElement) {
+    async captureSourceImage(inputImageElement) {
+        this.sourceImageMat = cv.imread(inputImageElement);
+        this.sourceImageDebugMat = this.sourceImageMat.clone();
+
+        let imageTextData = await this.identifyImageTextData(inputImageElement);
+        this.sourceTextInfo = imageTextData.data;
+    }
+
+    async step(inputImageElement, debugInputImageElement, debugReferenceImageElement) {
+        // Return null if things aren't ready
+
+        // Put mat 
+        this.inputImageMat = cv.imread(inputImageElement);
+        this.inputImageDebugMat = this.inputImageMat.clone();
+
+        // Detect hands
+        let handsInfo = this.detectHands(inputImageElement);
+
+        // Align two images and get homography
+        let homography = this.compareFeatures(this.inputImageMat, this.sourceImageMat, this.inputImageDebugMat);
+
+        // Draw text data
+        this.drawImageTextData(this.inputImageDebugMat, this.sourceImageDebugMat, this.sourceTextInfo, homography);
+
+        // Draw hands 
+        this.drawHands(this.inputImageDebugMat, handsInfo);
+
+        // Draw mats on elements
+        cv.imshow(debugInputImageElement, this.inputImageDebugMat);
+        cv.imshow(debugReferenceImageElement, this.sourceImageDebugMat);
+    }
+
+    detectHands(inputImageElement) {
         console.log("Detecting hands");
         const handLandmarkerResult = this.handLandmarker.detect(inputImageElement);
+        return handLandmarkerResult;
+    }
 
+    drawHands(inputMat, handLandmarkerResult) {
         if (handLandmarkerResult.landmarks.length > 0) {
-            let src = cv.imread(inputImageElement);
+            let src = inputMat;
 
             handLandmarkerResult.landmarks.forEach((landmarks) => {
                 for (let i = 0; i < landmarks.length; i++) {
@@ -81,23 +120,10 @@ class WatVision {
                     cv.line(src, new cv.Point(startX, startY), new cv.Point(endX, endY), [0, 255, 0, 255], 2);
                 });
             });
-
-            cv.imshow(inputImageElement, src);
-            src.delete();
         }
-
-        return true;
     }
 
-    compareFeatures(img1Element, img2Element, debugCanvasElement) {
-        if (!img1Element || !img2Element || !debugCanvasElement) return;
-
-        console.log("Starting compare features");
-
-        // Read images into OpenCV Mat
-        let img1 = cv.imread(img1Element);
-        let img2 = cv.imread(img2Element);
-
+    compareFeatures(img1, img2, img1Debug) {
         // Convert to grayscale for feature detection
         let img1Gray = new cv.Mat();
         let img2Gray = new cv.Mat();
@@ -162,9 +188,7 @@ class WatVision {
         // Create a MatVector and push the aligned corners
         let alignedCornersMatVector = new cv.MatVector();
         alignedCornersMatVector.push_back(alignedCornersInt);
-        cv.polylines(img1, alignedCornersMatVector, true, [0, 255, 0, 255], 2);
-
-        cv.imshow(debugCanvasElement, img1);
+        cv.polylines(img1Debug, alignedCornersMatVector, true, [0, 255, 0, 255], 2);
 
         // let matchedImage = new cv.Mat();
         // cv.drawMatches(img1, keypoints1, img2Gray, keypoints2, goodMatches, matchedImage);
@@ -185,7 +209,7 @@ class WatVision {
     }
 
     async identifyImageTextData(imageElement) {
-        const imgSrcResponse = await fetch(imageElement.current.src);
+        const imgSrcResponse = await fetch(imageElement.src);
         const imgBlob = await imgSrcResponse.blob();
 
         const formData = new FormData();
@@ -200,16 +224,7 @@ class WatVision {
         return response.data;
     }
 
-    copyImage(srcElement, destElement) {
-        const src = cv.imread(srcElement);
-        cv.imshow(destElement, src);
-        src.delete();
-    }
-
-    drawImageTextData(inputImageElement, compareImageElement, imageTextData, homography) {
-        const compareSrc = cv.imread(compareImageElement);
-        const inputSrc = cv.imread(inputImageElement);
-
+    drawImageTextData(inputSrc, compareSrc, imageTextData, homography) {
         // Get original image size from imageTextData.readResults.width and height
         let { width, height } = imageTextData.readResults[0];
 
@@ -242,7 +257,7 @@ class WatVision {
                 cv.line(compareSrc, new cv.Point(x2, y2), new cv.Point(x3, y3), [0, 0, 255, 255], 2);
                 cv.line(compareSrc, new cv.Point(x3, y3), new cv.Point(x0, y0), [0, 0, 255, 255], 2);
 
-                
+
                 let boxPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [x0, y0, x1, y1, x2, y2, x3, y3]);
                 let alignedBox = new cv.Mat();
                 cv.perspectiveTransform(boxPoints, alignedBox, homography);
@@ -258,11 +273,6 @@ class WatVision {
 
             });
         });
-
-        cv.imshow(inputImageElement, inputSrc); // Original image
-        cv.imshow(compareImageElement, compareSrc); // Original image
-        compareSrc.delete();
-        inputSrc.delete();
     }
 }
 
