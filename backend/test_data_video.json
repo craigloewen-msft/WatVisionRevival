@@ -1,0 +1,310 @@
+{
+    "version": "3.2.0",
+    "modelVersion": "2022-04-30",
+    "readResults": [
+        {
+            "page": 1,
+            "language": "en",
+            "angle": 1.9325,
+            "width": 1088,
+            "height": 1920,
+            "unit": "pixel",
+            "lines": [
+                {
+                    "boundingBox": [
+                        579,
+                        718,
+                        669,
+                        720,
+                        667,
+                        759,
+                        577,
+                        755
+                    ],
+                    "appearance": {
+                        "style": {
+                            "name": "other",
+                            "confidence": 0.972
+                        }
+                    },
+                    "text": "CAT",
+                    "words": [
+                        {
+                            "boundingBox": [
+                                578,
+                                718,
+                                662,
+                                720,
+                                661,
+                                759,
+                                577,
+                                756
+                            ],
+                            "text": "CAT",
+                            "confidence": 0.992
+                        }
+                    ]
+                },
+                {
+                    "boundingBox": [
+                        222,
+                        859,
+                        321,
+                        863,
+                        318,
+                        901,
+                        220,
+                        897
+                    ],
+                    "appearance": {
+                        "style": {
+                            "name": "other",
+                            "confidence": 0.972
+                        }
+                    },
+                    "text": "DOG",
+                    "words": [
+                        {
+                            "boundingBox": [
+                                221,
+                                859,
+                                308,
+                                862,
+                                307,
+                                900,
+                                220,
+                                897
+                            ],
+                            "text": "DOG",
+                            "confidence": 0.997
+                        }
+                    ]
+                },
+                {
+                    "boundingBox": [
+                        639,
+                        978,
+                        802,
+                        984,
+                        801,
+                        1022,
+                        638,
+                        1017
+                    ],
+                    "appearance": {
+                        "style": {
+                            "name": "other",
+                            "confidence": 0.972
+                        }
+                    },
+                    "text": "MOUSE",
+                    "words": [
+                        {
+                            "boundingBox": [
+                                641,
+                                979,
+                                792,
+                                984,
+                                792,
+                                1022,
+                                639,
+                                1017
+                            ],
+                            "text": "MOUSE",
+                            "confidence": 0.998
+                        }
+                    ]
+                },
+                {
+                    "boundingBox": [
+                        303,
+                        1059,
+                        422,
+                        1063,
+                        420,
+                        1101,
+                        302,
+                        1097
+                    ],
+                    "appearance": {
+                        "style": {
+                            "name": "other",
+                            "confidence": 0.972
+                        }
+                    },
+                    "text": "FROG",
+                    "words": [
+                        {
+                            "boundingBox": [
+                                304,
+                                1060,
+                                407,
+                                1064,
+                                405,
+                                1101,
+                                302,
+                                1098
+                            ],
+                            "text": "FROG",
+                            "confidence": 0.989
+                        }
+                    ]
+                },
+                {
+                    "boundingBox": [
+                        1020,
+                        1284,
+                        1044,
+                        1285,
+                        1044,
+                        1295,
+                        1020,
+                        1294
+                    ],
+                    "appearance": {
+                        "style": {
+                            "name": "handwriting",
+                            "confidence": 0.474
+                        }
+                    },
+                    "text": "A",
+                    "words": [
+                        {
+                            "boundingBox": [
+                                1025,
+                                1284,
+                                1032,
+                                1284,
+                                1032,
+                                1294,
+                                1025,
+                                1294
+                            ],
+                            "text": "A",
+                            "confidence": 0.637
+                        }
+                    ]
+                },
+                {
+                    "boundingBox": [
+                        378,
+                        1298,
+                        473,
+                        1301,
+                        473,
+                        1318,
+                        377,
+                        1315
+                    ],
+                    "appearance": {
+                        "style": {
+                            "name": "other",
+                            "confidence": 0.972
+                        }
+                    },
+                    "text": "SAMSUNG",
+                    "words": [
+                        {
+                            "boundingBox": [
+                                378,
+                                1298,
+                                470,
+                                1301,
+                                469,
+                                1319,
+                                378,
+                                1315
+                            ],
+                            "text": "SAMSUNG",
+                            "confidence": 0.996
+                        }
+                    ]
+                },
+                {
+                    "boundingBox": [
+                        818,
+                        1810,
+                        835,
+                        1810,
+                        834,
+                        1817,
+                        818,
+                        1818
+                    ],
+                    "appearance": {
+                        "style": {
+                            "name": "other",
+                            "confidence": 0.972
+                        }
+                    },
+                    "text": ". .",
+                    "words": [
+                        {
+                            "boundingBox": [
+                                818,
+                                1810,
+                                823,
+                                1810,
+                                823,
+                                1818,
+                                818,
+                                1818
+                            ],
+                            "text": ".",
+                            "confidence": 0.656
+                        },
+                        {
+                            "boundingBox": [
+                                830,
+                                1810,
+                                834,
+                                1810,
+                                834,
+                                1817,
+                                830,
+                                1818
+                            ],
+                            "text": ".",
+                            "confidence": 0.901
+                        }
+                    ]
+                },
+                {
+                    "boundingBox": [
+                        768,
+                        1827,
+                        768,
+                        1844,
+                        761,
+                        1844,
+                        761,
+                        1827
+                    ],
+                    "appearance": {
+                        "style": {
+                            "name": "other",
+                            "confidence": 0.945
+                        }
+                    },
+                    "text": "-",
+                    "words": [
+                        {
+                            "boundingBox": [
+                                768,
+                                1829,
+                                768,
+                                1833,
+                                761,
+                                1833,
+                                761,
+                                1829
+                            ],
+                            "text": "-",
+                            "confidence": 0.884
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

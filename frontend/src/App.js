@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, NavLink } from "react-router-do
 import Home from "./pages/Home";
 import About from "./pages/About";
 import Debug from "./pages/Debug";
+import DebugVideo from "./pages/DebugVideo";
 import "./App.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 
@@ -23,7 +24,10 @@ function App() {
                 <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/about">About</NavLink>
               </li>
               <li className="nav-item">
-                <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/debug">Debug</NavLink>
+                <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/debug">Debug Image</NavLink>
+              </li>
+              <li className="nav-item">
+                <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/debug-video">Debug Video</NavLink>
               </li>
             </ul>
           </div>
@@ -34,6 +38,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
             <Route path="/debug" element={<Debug />} />
+            <Route path="/debug-video" element={<DebugVideo />} />
           </Routes>
         </main>
       </div>

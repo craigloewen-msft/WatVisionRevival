@@ -7,7 +7,7 @@ const stream = require('stream');
 const fs = require('fs');
 const path = require('path');
 
-const dataPath = path.join(__dirname, 'test_data_screen.json');
+const dataPath = path.join(__dirname, 'test_data_video.json');
 const rawData = fs.readFileSync(dataPath);
 const testData = JSON.parse(rawData);
 
@@ -49,6 +49,7 @@ class VisionManager {
 
         // } catch (error) {
         //     console.error('Error analyzing image:', error);
+        //     return;
         // }
 
         return testData;

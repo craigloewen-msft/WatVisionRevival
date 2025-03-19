@@ -95,6 +95,10 @@ class WatVision {
         cv.imshow(debugReferenceImageElement, this.sourceImageDebugMat);
     }
 
+    doesSourceImageExist() {
+        return this.sourceImageMat !== null;
+    }
+
     detectHands(inputImageElement) {
         console.log("Detecting hands");
         const handLandmarkerResult = this.handLandmarker.detect(inputImageElement);
@@ -208,9 +212,19 @@ class WatVision {
         return homography;
     }
 
-    async identifyImageTextData(imageElement) {
-        const imgSrcResponse = await fetch(imageElement.src);
-        const imgBlob = await imgSrcResponse.blob();
+    async identifyImageTextData(inputElement) {
+        let imgBlob;
+
+        if (inputElement instanceof HTMLImageElement) {
+            // Handle <img> element
+            const imgSrcResponse = await fetch(inputElement.src);
+            imgBlob = await imgSrcResponse.blob();
+        } else if (inputElement instanceof HTMLCanvasElement) {
+            // Handle <canvas> element
+            imgBlob = await new Promise(resolve => inputElement.toBlob(resolve, "image/png"));
+        } else {
+            throw new Error("Input must be an image or canvas element.");
+        }
 
         const formData = new FormData();
         formData.append("image", imgBlob, "image.png");

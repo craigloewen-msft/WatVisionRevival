@@ -11,8 +11,6 @@ function Debug() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [visionReady, setVisionReady] = useState(false);
-
   const [watVision, setWatVision] = useState(null);
 
   useEffect(() => {
@@ -63,14 +61,6 @@ function Debug() {
     }
   }, [watVision]);
 
-  const handleButtonClick = () => {
-    const imgElement = debugInputImageRef.current;
-    // const imgElement = imageRef.current;
-    if (imgElement) {
-      watVision.detectHands(imgElement);
-    }
-  };
-
   return (
     <div className="container">
       {/* Load image from the public directory */}
@@ -99,7 +89,7 @@ function Debug() {
       <div className="row">
         <div className="col-6">
           <h3>Debug input image</h3>
-          <canvas onClick={handleButtonClick} ref={debugInputImageRef} />
+          <canvas ref={debugInputImageRef} />
         </div>
         <div className="col-6">
           <h3>Debug source image</h3>
