@@ -78,17 +78,21 @@ class WatVision {
         this.inputImageMat = cv.imread(inputImageElement);
         this.inputImageDebugMat = this.inputImageMat.clone();
 
+        this.sourceImageDebugMat = this.sourceImageMat.clone();
+
         // Detect hands
         let handsInfo = this.detectHands(inputImageElement);
 
         // Align two images and get homography
         let homography = this.compareFeatures(this.inputImageMat, this.sourceImageMat, this.inputImageDebugMat);
 
+        let [inputFingerTipLocation, sourceFingerTipLocation] = this.calculateFingerTipLocation(handsInfo, homography, this.inputImageMat);
+
         // Draw text data
-        this.drawImageTextData(this.inputImageDebugMat, this.sourceImageDebugMat, this.sourceTextInfo, homography);
+        this.drawImageTextData(this.inputImageDebugMat, this.sourceImageDebugMat, this.sourceTextInfo, homography, inputFingerTipLocation, sourceFingerTipLocation);
 
         // Draw hands 
-        this.drawHands(this.inputImageDebugMat, handsInfo);
+        this.drawHands(this.inputImageDebugMat, this.sourceImageDebugMat, handsInfo, sourceFingerTipLocation);
 
         // Draw mats on elements
         cv.imshow(debugInputImageElement, this.inputImageDebugMat);
@@ -105,15 +109,16 @@ class WatVision {
         return handLandmarkerResult;
     }
 
-    drawHands(inputMat, handLandmarkerResult) {
+    drawHands(inputDebugMat, sourceDebugMat, handLandmarkerResult, sourceFingerTipLocation) {
         if (handLandmarkerResult.landmarks.length > 0) {
-            let src = inputMat;
+            let src = inputDebugMat;
 
             handLandmarkerResult.landmarks.forEach((landmarks) => {
                 for (let i = 0; i < landmarks.length; i++) {
                     let x = landmarks[i].x * src.cols;
                     let y = landmarks[i].y * src.rows;
-                    cv.circle(src, new cv.Point(x, y), 5, [0, 0, 255, 255], -1);
+                    let color = (i === 8) ? [255, 0, 0, 255] : [0, 0, 255, 255]; // Red for index finger tip, blue for others
+                    cv.circle(src, new cv.Point(x, y), 5, color, -1);
                 }
 
                 HAND_CONNECTIONS.forEach(([startIdx, endIdx]) => {
@@ -124,6 +129,10 @@ class WatVision {
                     cv.line(src, new cv.Point(startX, startY), new cv.Point(endX, endY), [0, 255, 0, 255], 2);
                 });
             });
+
+            if (sourceFingerTipLocation) {
+                cv.circle(sourceDebugMat, new cv.Point(sourceFingerTipLocation.x, sourceFingerTipLocation.y), 5, [255, 0, 0, 255], -1);
+            }
         }
     }
 
@@ -243,7 +252,7 @@ class WatVision {
         return response.data;
     }
 
-    drawImageTextData(inputSrc, compareSrc, imageTextData, homography) {
+    drawImageTextData(inputSrc, compareSrc, imageTextData, homography, inputFingerTipLocation, sourceFingerTipLocation) {
         // Get original image size from imageTextData.readResults.width and height
         let { width, height } = imageTextData.readResults[0];
 
@@ -271,11 +280,22 @@ class WatVision {
                 x3 = x3 * scale;
                 y3 = y3 * scale;
 
-                cv.line(compareSrc, new cv.Point(x0, y0), new cv.Point(x1, y1), [0, 0, 255, 255], 2);
-                cv.line(compareSrc, new cv.Point(x1, y1), new cv.Point(x2, y2), [0, 0, 255, 255], 2);
-                cv.line(compareSrc, new cv.Point(x2, y2), new cv.Point(x3, y3), [0, 0, 255, 255], 2);
-                cv.line(compareSrc, new cv.Point(x3, y3), new cv.Point(x0, y0), [0, 0, 255, 255], 2);
+                let boxColor = [0, 0, 255, 255]; // Default color
 
+                // Check if sourceFingerTipLocation is inside the text box
+                if (sourceFingerTipLocation) {
+                    let { x, y } = sourceFingerTipLocation;
+                    if (x >= x0 && x <= x2 && y >= y0 && y <= y2) {
+                        boxColor = [0, 255, 0, 255]; // Change color if inside the box
+                    }
+                }
+
+                cv.line(compareSrc, new cv.Point(x0, y0), new cv.Point(x1, y1), boxColor, 2);
+                cv.line(compareSrc, new cv.Point(x1, y1), new cv.Point(x2, y2), boxColor, 2);
+                cv.line(compareSrc, new cv.Point(x2, y2), new cv.Point(x3, y3), boxColor, 2);
+                cv.line(compareSrc, new cv.Point(x3, y3), new cv.Point(x0, y0), boxColor, 2);
+
+                boxColor = [0, 0, 255, 255]; // Reset color
 
                 let boxPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [x0, y0, x1, y1, x2, y2, x3, y3]);
                 let alignedBox = new cv.Mat();
@@ -288,10 +308,40 @@ class WatVision {
                 // Create a MatVector and push the aligned corners
                 let alignedBoxMatVector = new cv.MatVector();
                 alignedBoxMatVector.push_back(alignedBoxInt);
-                cv.polylines(inputSrc, alignedBoxMatVector, true, [0, 0, 255, 255], 2);
 
+                if (inputFingerTipLocation) {
+                    let { x, y } = inputFingerTipLocation;
+                    if (x >= alignedBox.data32F[0] && x <= alignedBox.data32F[4] && y >= alignedBox.data32F[1] && y <= alignedBox.data32F[5]) {
+                        boxColor = [0, 255, 0, 255]; // Change color if inside the box
+                    }
+                }
+
+                cv.polylines(inputSrc, alignedBoxMatVector, true, boxColor, 2);
             });
         });
+    }
+
+    calculateFingerTipLocation(handsInfo, homography, inputImageMat) {
+        if (handsInfo.landmarks.length > 0) {
+            let src = inputImageMat;
+
+            let landmarks = handsInfo.landmarks[0];
+            let x = landmarks[8].x * src.cols;
+            let y = landmarks[8].y * src.rows;
+
+            let homographyInv = new cv.Mat();
+            cv.invert(homography, homographyInv);
+
+            let srcPoint = new cv.matFromArray(1, 1, cv.CV_32FC2, [x, y]);
+            let dstPoint = new cv.Mat();
+            cv.perspectiveTransform(srcPoint, dstPoint, homographyInv);
+
+            let [dstX, dstY] = dstPoint.data32F;
+
+            return [{ x: x, y: y }, { x: dstX, y: dstY }];
+        } else {
+            return [null, null];
+        }
     }
 }
 
