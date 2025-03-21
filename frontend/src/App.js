@@ -3,6 +3,7 @@ import Home from "./pages/Home";
 import About from "./pages/About";
 import Debug from "./pages/Debug";
 import DebugVideo from "./pages/DebugVideo";
+import DebugCamera from "./pages/DebugCamera";
 import "./App.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 
@@ -29,6 +30,9 @@ function App() {
               <li className="nav-item">
                 <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/debug-video">Debug Video</NavLink>
               </li>
+              <li className="nav-item">
+                <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/debug-camera">Debug Camera</NavLink>
+              </li>
             </ul>
           </div>
         </nav>
@@ -39,6 +43,7 @@ function App() {
             <Route path="/about" element={<About />} />
             <Route path="/debug" element={<Debug />} />
             <Route path="/debug-video" element={<DebugVideo />} />
+            <Route path="/debug-camera" element={<DebugCamera />} />
           </Routes>
         </main>
       </div>
