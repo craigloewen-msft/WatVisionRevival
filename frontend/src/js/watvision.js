@@ -128,6 +128,8 @@ class WatVision {
     }
 
     compareFeatures(img1, img2, img1Debug) {
+        let knnDistance_option = 0.7;
+
         // Convert to grayscale for feature detection
         let img1Gray = new cv.Mat();
         let img2Gray = new cv.Mat();
@@ -146,24 +148,27 @@ class WatVision {
 
         // Match descriptors using BFMatcher with Hamming distance
         let bf = new cv.BFMatcher();
-        let matches = new cv.DMatchVector();
-        bf.match(descriptors1, descriptors2, matches);
-
-        // Extract matched keypoints
+        let matches = new cv.DMatchVectorVector();
         let goodMatches = new cv.DMatchVector();
+        bf.knnMatch(descriptors1, descriptors2, matches, 2);
 
-        // Sort matches by distance and only take top 10
-        let topMatchesCount = 30;
+        for (let i = 0; i < matches.size(); ++i) {
+            let match = matches.get(i);
+            let dMatch1 = match.get(0);
+            let dMatch2 = match.get(1);
+            if (dMatch1.distance <= dMatch2.distance * knnDistance_option) {
+                goodMatches.push_back(dMatch1);
+            }
+        }
+
+        console.log("Number of good matches: " + goodMatches.size());
 
         let matchesArray = [];
-        for (let i = 0; i < matches.size(); i++) {
-            matchesArray.push(matches.get(i));
+        for (let i = 0; i < goodMatches.size(); i++) {
+            matchesArray.push(goodMatches.get(i));
         }
 
         matchesArray.sort((a, b) => a.distance - b.distance);
-        for (let i = 0; i < topMatchesCount; i++) {
-            goodMatches.push_back(matchesArray[i]);
-        }
 
         // Get key points from good matches
         let srcPointsArray = [];
