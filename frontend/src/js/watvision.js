@@ -6,6 +6,10 @@ import {
 } from "@mediapipe/tasks-vision";
 import { HAND_CONNECTIONS } from "@mediapipe/hands";
 
+
+import { pipeline } from '@huggingface/transformers';
+
+
 class WatVision {
 
     constructor() {
@@ -15,6 +19,7 @@ class WatVision {
 
         this.inputImageMat = null;
         this.sourceImageMat = null;
+        this.sourceImageBlob = null;
 
         this.sourceTextInfo = null;
 
@@ -67,6 +72,7 @@ class WatVision {
         this.sourceImageMat = cv.imread(inputImageElement);
         this.sourceImageDebugMat = this.sourceImageMat.clone();
 
+        this.sourceImageBlob = await this.getImageBlob(inputImageElement);
         let imageTextData = await this.identifyImageTextData(inputImageElement);
         this.sourceTextInfo = imageTextData.data;
     }
@@ -84,9 +90,12 @@ class WatVision {
         let handsInfo = this.detectHands(inputImageElement);
 
         // Align two images and get homography
-        let homography = this.compareFeatures(this.inputImageMat, this.sourceImageMat, this.inputImageDebugMat);
+        let homography = await this.compareFeatures(inputImageElement, this.sourceImageBlob);
 
         let [inputFingerTipLocation, sourceFingerTipLocation] = this.calculateFingerTipLocation(handsInfo, homography, this.inputImageMat);
+
+        // Draw bounding box of source on input
+        this.drawSourceOnInput(this.inputImageDebugMat, this.sourceImageDebugMat, homography);
 
         // Draw text data
         this.drawImageTextData(this.inputImageDebugMat, this.sourceImageDebugMat, this.sourceTextInfo, homography, inputFingerTipLocation, sourceFingerTipLocation);
@@ -107,6 +116,24 @@ class WatVision {
         console.log("Detecting hands");
         const handLandmarkerResult = this.handLandmarker.detect(inputImageElement);
         return handLandmarkerResult;
+    }
+
+    drawSourceOnInput(inputDebugMat, sourceDebugMat, homography) {
+        let { width, height } = sourceDebugMat.size();
+        let cornerPts = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, width, 0, width, height, 0, height]);
+        let alignedCorners = new cv.Mat();
+        cv.perspectiveTransform(cornerPts, alignedCorners, homography);
+        // Convert alignedCorners to integer points
+        let alignedCornersInt = new cv.Mat();
+        alignedCorners.convertTo(alignedCornersInt, cv.CV_32SC2);
+        // Create a MatVector and push the aligned corners
+        let alignedCornersMatVector = new cv.MatVector();
+        alignedCornersMatVector.push_back(alignedCornersInt);
+        cv.polylines(inputDebugMat, alignedCornersMatVector, true, [0, 255, 0, 255], 2);
+
+        alignedCorners.delete();
+        alignedCornersInt.delete();
+        alignedCornersMatVector.delete();
     }
 
     drawHands(inputDebugMat, sourceDebugMat, handLandmarkerResult, sourceFingerTipLocation) {
@@ -136,7 +163,44 @@ class WatVision {
         }
     }
 
-    compareFeatures(img1, img2, img1Debug) {
+    async getImageBlob(inputElement) {
+         let imgBlob;
+
+        if (inputElement instanceof HTMLImageElement) {
+            // Handle <img> element
+            const imgSrcResponse = await fetch(inputElement.src);
+            imgBlob = await imgSrcResponse.blob();
+        } else if (inputElement instanceof HTMLCanvasElement) {
+            // Handle <canvas> element
+            imgBlob = await new Promise(resolve => inputElement.toBlob(resolve, "image/jpeg"));
+        } else {
+            throw new Error("Input must be an image or canvas element.");
+        }
+
+        return imgBlob;
+    }
+
+    async compareFeatures(inputImageElement, sourceBlob) {
+
+        let imgBlob = await this.getImageBlob(inputImageElement);
+
+        const formData = new FormData();
+        formData.append("input", imgBlob, "input.jpeg");
+        formData.append("source", sourceBlob, "source.jpeg");
+
+        const response = await axios.post("/api/get_homography/", formData, {
+            headers: {
+                "Content-Type": "multipart/form-data",
+            },
+        });
+
+        let returnString = response.data;
+        // Convert from string to JSON data
+        let jsonData = JSON.parse(returnString.data);
+        return cv.matFromArray(3,3, cv.CV_32F, jsonData.flat());
+
+        let img1, img2;
+
         let knnDistance_option = 0.7;
 
         // Convert to grayscale for feature detection
@@ -194,20 +258,6 @@ class WatVision {
         let dstMat = cv.matFromArray(goodMatches.size(), 2, cv.CV_32F, dstPointsArray);
         let homography = cv.findHomography(dstMat, srcMat, cv.RANSAC, 5);
 
-        let { width, height } = img2.size();
-        let cornerPts = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, width, 0, width, height, 0, height]);
-        let alignedCorners = new cv.Mat();
-        cv.perspectiveTransform(cornerPts, alignedCorners, homography);
-
-        // Convert alignedCorners to integer points
-        let alignedCornersInt = new cv.Mat();
-        alignedCorners.convertTo(alignedCornersInt, cv.CV_32SC2);
-
-        // Create a MatVector and push the aligned corners
-        let alignedCornersMatVector = new cv.MatVector();
-        alignedCornersMatVector.push_back(alignedCornersInt);
-        cv.polylines(img1Debug, alignedCornersMatVector, true, [0, 255, 0, 255], 2);
-
         // let matchedImage = new cv.Mat();
         // cv.drawMatches(img1, keypoints1, img2Gray, keypoints2, goodMatches, matchedImage);
         // cv.imshow(debugCanvasElement, matchedImage);
@@ -227,23 +277,12 @@ class WatVision {
     }
 
     async identifyImageTextData(inputElement) {
-        let imgBlob;
-
-        if (inputElement instanceof HTMLImageElement) {
-            // Handle <img> element
-            const imgSrcResponse = await fetch(inputElement.src);
-            imgBlob = await imgSrcResponse.blob();
-        } else if (inputElement instanceof HTMLCanvasElement) {
-            // Handle <canvas> element
-            imgBlob = await new Promise(resolve => inputElement.toBlob(resolve, "image/png"));
-        } else {
-            throw new Error("Input must be an image or canvas element.");
-        }
+        let imgBlob = await this.getImageBlob(inputElement);
 
         const formData = new FormData();
         formData.append("image", imgBlob, "image.png");
 
-        const response = await axios.post("/api/vision/", formData, {
+        const response = await axios.post("/api/get_text_info/", formData, {
             headers: {
                 "Content-Type": "multipart/form-data",
             },
