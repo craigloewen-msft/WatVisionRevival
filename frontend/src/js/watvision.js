@@ -6,10 +6,6 @@ import {
 } from "@mediapipe/tasks-vision";
 import { HAND_CONNECTIONS } from "@mediapipe/hands";
 
-
-import { pipeline } from '@huggingface/transformers';
-
-
 class WatVision {
 
     constructor() {
@@ -164,7 +160,7 @@ class WatVision {
     }
 
     async getImageBlob(inputElement) {
-         let imgBlob;
+        let imgBlob;
 
         if (inputElement instanceof HTMLImageElement) {
             // Handle <img> element
@@ -197,7 +193,7 @@ class WatVision {
         let returnString = response.data;
         // Convert from string to JSON data
         let jsonData = JSON.parse(returnString.data);
-        return cv.matFromArray(3,3, cv.CV_32F, jsonData.flat());
+        return cv.matFromArray(3, 3, cv.CV_32F, jsonData.flat());
 
         let img1, img2;
 

@@ -14,6 +14,41 @@ from PIL import Image
 import io
 
 from modules.xfeat import XFeat
+import matplotlib.pyplot as plt
+
+from vision_instance import VisionInstance
+
+def warp_corners_and_draw_matches(ref_points, dst_points, img1, img2):
+    # Calculate the Homography matrix
+    H, mask = cv2.findHomography(ref_points, dst_points, cv2.USAC_MAGSAC, 3.5, maxIters=1_000, confidence=0.999)
+    mask = mask.flatten()
+
+    print('inlier ratio: ', np.sum(mask)/len(mask))
+
+    # Get corners of the first image (image1)
+    h, w = img1.shape[:2]
+    corners_img1 = np.array([[0, 0], [w-1, 0], [w-1, h-1], [0, h-1]], dtype=np.float32).reshape(-1, 1, 2)
+
+    # Warp corners to the second image (image2) space
+    warped_corners = cv2.perspectiveTransform(corners_img1, H)
+
+    # Draw the warped corners in image2
+    img2_with_corners = img2.copy()
+    for i in range(len(warped_corners)):
+        start_point = tuple(warped_corners[i-1][0].astype(int))
+        end_point = tuple(warped_corners[i][0].astype(int))
+        cv2.line(img2_with_corners, start_point, end_point, (255, 0, 0), 4)  # Using solid green for corners
+
+    # Prepare keypoints and matches for drawMatches function
+    keypoints1 = [cv2.KeyPoint(p[0], p[1], 5) for p in ref_points]
+    keypoints2 = [cv2.KeyPoint(p[0], p[1], 5) for p in dst_points]
+    matches = [cv2.DMatch(i,i,0) for i in range(len(mask)) if mask[i]]
+
+    # Draw inlier matches
+    img_matches = cv2.drawMatches(img1, keypoints1, img2_with_corners, keypoints2, matches, None,
+                                  matchColor=(0, 255, 0), flags=2)
+
+    return (img_matches, H)
 
 class VisionManager:
     def __init__(self, app):
@@ -27,11 +62,33 @@ class VisionManager:
             self.azure_vision_endpoint, CognitiveServicesCredentials(self.azure_vision_key)
         )
 
-        data_path = os.path.join(os.path.dirname(__file__), 'test_data_video.json')
+        data_path = os.path.join(os.path.dirname(__file__), 'test_data_screen.json')
         with open(data_path, 'r') as file:
             self.test_data = json.load(file)
 
-        self.xfeat = XFeat()
+        self.xfeat = torch.hub.load('verlab/accelerated_features', 'XFeat', pretrained = True, top_k = 4096)
+
+        self.visionInstanceList = [ VisionInstance() ]
+
+    def __get_cv_image_from_input(self, input_image):
+        input_path = os.path.join(os.getcwd(), 'source_image.jpg')
+        input_image.save(input_path)
+
+        input_image = cv2.imread(input_path)
+        if input_image is None:
+            raise ValueError("Source image could not be loaded")
+        
+        return input_image
+
+    def set_source_image(self, source_image):
+        # Save the source image to a temporary location
+
+        # Set the source image in the VisionInstance
+        self.visionInstanceList[0].set_source_image(source_image)
+    
+    def step(self, input_image):
+
+        input_image = self.__get_cv_image_from_input(input_image)
 
     def get_text_info(self, input_image):
         # Input is expected to be a file-like object with 'mimetype' and 'buffer' attributes
@@ -61,57 +118,20 @@ class VisionManager:
 
         if input_image is None or source_image is None:
             return json.dumps([])
+
+        output0 = self.xfeat.detectAndCompute(source_image, top_k = 4096)[0]
+        output1 = self.xfeat.detectAndCompute(input_image, top_k = 4096)[0]
+
+        output0.update({'image_size': (source_image.shape[1], source_image.shape[0])})
+        output1.update({'image_size': (input_image.shape[1], input_image.shape[0])})
         
-        # Ensure both images have the same resolution
-        if input_image.shape[:2] != source_image.shape[:2]:
-            source_image = cv2.resize(source_image, (input_image.shape[1], input_image.shape[0]))
-        
-        # Reshape input image and source image to a batch of 1
-        input_image_batch = np.expand_dims(input_image, axis=0)
-        source_image_batch = np.expand_dims(source_image, axis=0)
+        mkpts_0, mkpts_1, other = self.xfeat.match_lighterglue(output0, output1)
 
-        # Detect keypoints and descriptors using XFeat
-        matches_list = self.xfeat.match_xfeat_star(input_image_batch, source_image_batch)
-
-        input_matches_list = matches_list[0]
-        source_matches_list = matches_list[1]
-
-        # Calculate homography
-        homography, mask = cv2.findHomography(source_matches_list, input_matches_list, cv2.RANSAC, 5)
-
-        good_matches = np.sum(mask)
-        print(f"Percent good matches: {good_matches / len(mask) * 100:.2f}% - {good_matches} / {len(mask)}")
-
-        # Concatenate the two images side by side
-        concatenated_image = cv2.hconcat([input_image, source_image])
-
-        # Draw matches on the concatenated image with a gradient from green to red
-        num_matches = len(input_matches_list)
-        for i, (input_point, source_point) in enumerate(zip(input_matches_list, source_matches_list)):
-            input_x, input_y = int(input_point[0]), int(input_point[1])
-            source_x, source_y = int(source_point[0] + input_image.shape[1]), int(source_point[1])  # Offset x-coordinate for the source image
-            
-            if mask[i] == 0:
-                # Calculate gradient color (green to red)
-                r = 255
-                g = 0
-                b = 0  # No blue component
-                color = (b, g, r)
-            if mask[i] == 1:
-                # Calculate gradient color (blue to purple)
-                r = 0
-                g = 255
-                b = 0
-                color = (b, g, r)
-            
-            # Draw circles and lines with the gradient color
-            cv2.circle(concatenated_image, (input_x, input_y), 5, color, -1)
-            cv2.circle(concatenated_image, (source_x, source_y), 5, color, -1)
-            cv2.line(concatenated_image, (input_x, input_y), (source_x, source_y), color, 1)
+        canvas, homography = warp_corners_and_draw_matches(mkpts_0, mkpts_1, source_image, input_image)
 
         # Save the concatenated image with matches
         concatenated_image_path = os.path.join(os.getcwd(), 'concatenated_image_with_matches.jpg')
-        cv2.imwrite(concatenated_image_path, concatenated_image)
+        cv2.imwrite(concatenated_image_path, canvas)
 
         # Convert homography matrix to a np array
         homography = np.array(homography).tolist()

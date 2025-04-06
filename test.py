@@ -6,9 +6,6 @@ import tqdm
 import cv2
 import matplotlib.pyplot as plt
 
-import cv2
-import numpy as np
-
 def warp_corners_and_draw_matches(ref_points, dst_points, img1, img2):
     # Calculate the Homography matrix
     H, mask = cv2.findHomography(ref_points, dst_points, cv2.USAC_MAGSAC, 3.5, maxIters=1_000, confidence=0.999)

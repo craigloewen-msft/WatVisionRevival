@@ -64,6 +64,31 @@ def get_homography():
     source_file.save(source_path)
     return try_catch_result(lambda: vision_manager.get_homography(input_path, source_path))
 
+@app.route('/api/set_source_image/', methods=['POST'])
+def set_source_image():
+    if 'source' not in request.files:
+        return jsonify(success=False, error="No file part")
+    
+    file = request.files['source']
+    if file.filename == '':
+        return jsonify(success=False, error="No selected file")
+    
+    # Save the source image to a temporary location
+    source_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+    file.save(source_path)
+    
+    # Set the source image in the VisionManager
+    vision_manager.visionInstanceList[0].set_source_image(source_path)
+    
+    return try_catch_result(lambda: vision_manager.set_source_image(request.files['image']))
+
+@app.route('/api/step/', methods=['POST'])
+def step():
+    if 'image' not in request.files:
+        return jsonify(success=False, error="No file part")
+    
+    return try_catch_result(lambda: vision_manager.step(request.files['image']))
+
 @app.route('/api/')
 def api():
     return jsonify(success=True, message="API is working!")
