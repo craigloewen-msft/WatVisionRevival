@@ -44,7 +44,7 @@ function Debug() {
 
         await watVision.captureSourceImage(compareElement);
 
-        watVision.step(currentImageElement, debugInputImageElement, debugReferenceImageElement);
+        await watVision.step(currentImageElement, debugInputImageElement, debugReferenceImageElement);
       } catch (err) {
         console.error(err);
         setError(err);
@@ -89,11 +89,11 @@ function Debug() {
       <div className="row">
         <div className="col-6">
           <h3>Debug input image</h3>
-          <canvas ref={debugInputImageRef} />
+          <img ref={debugInputImageRef} className="img-fluid" />
         </div>
         <div className="col-6">
           <h3>Debug source image</h3>
-          <canvas ref={debugReferenceImageRef} />
+          <img ref={debugReferenceImageRef} className="img-fluid" />
         </div>
       </div>
     </div>

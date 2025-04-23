@@ -69,18 +69,7 @@ def set_source_image():
     if 'source' not in request.files:
         return jsonify(success=False, error="No file part")
     
-    file = request.files['source']
-    if file.filename == '':
-        return jsonify(success=False, error="No selected file")
-    
-    # Save the source image to a temporary location
-    source_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-    file.save(source_path)
-    
-    # Set the source image in the VisionManager
-    vision_manager.visionInstanceList[0].set_source_image(source_path)
-    
-    return try_catch_result(lambda: vision_manager.set_source_image(request.files['image']))
+    return try_catch_result(lambda: vision_manager.set_source_image(request.files['source']))
 
 @app.route('/api/step/', methods=['POST'])
 def step():

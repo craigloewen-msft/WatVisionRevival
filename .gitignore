@@ -5,3 +5,9 @@ dist/
 nohup.out
 **/*.env
 .venv
+
+# Ignore all __pycache__ directories even in nested directories
+# https://git-scm.com/docs/gitignore#_pattern_format
+**/__pycache__/
+
+*.jpg

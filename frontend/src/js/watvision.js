@@ -21,24 +21,26 @@ class WatVision {
 
         this.inputImageDebugMat = null;
         this.sourceImageDebugMat = null;
+
+        this.sourceImageCaptured = false;
     }
 
     async initVision() {
 
-        this.vision = await FilesetResolver.forVisionTasks(
-            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
-        );
+        // this.vision = await FilesetResolver.forVisionTasks(
+        //     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+        // );
 
-        this.handLandmarker = await HandLandmarker.createFromOptions(this.vision, {
-            baseOptions: {
-                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-                delegate: "GPU"
-            },
-            minHandPresenceConfidence: 0.01,
-            minHandDetectionConfidence: 0.01,
-            runningMode: "IMAGE",
-            numHands: 1
-        });
+        // this.handLandmarker = await HandLandmarker.createFromOptions(this.vision, {
+        //     baseOptions: {
+        //         modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+        //         delegate: "GPU"
+        //     },
+        //     minHandPresenceConfidence: 0.01,
+        //     minHandDetectionConfidence: 0.01,
+        //     runningMode: "IMAGE",
+        //     numHands: 1
+        // });
 
         console.log("Done initializing vision");
         return true;
@@ -65,16 +67,47 @@ class WatVision {
     }
 
     async captureSourceImage(inputImageElement) {
-        this.sourceImageMat = cv.imread(inputImageElement);
-        this.sourceImageDebugMat = this.sourceImageMat.clone();
+        let imgBlob = await this.getImageBlob(inputImageElement);
 
-        this.sourceImageBlob = await this.getImageBlob(inputImageElement);
-        let imageTextData = await this.identifyImageTextData(inputImageElement);
-        this.sourceTextInfo = imageTextData.data;
+        const formData = new FormData();
+        formData.append("source", imgBlob, "image.png");
+
+        const response = await axios.post("/api/set_source_image/", formData, {
+            headers: {
+                "Content-Type": "multipart/form-data",
+            },
+        });
+
+        if (response.data.success) {
+            this.sourceImageCaptured = true;
+        }
+
+        return response.data;
     }
 
     async step(inputImageElement, debugInputImageElement, debugReferenceImageElement) {
         // Return null if things aren't ready
+
+        let imgBlob = await this.getImageBlob(inputImageElement);
+
+        const formData = new FormData();
+        formData.append("image", imgBlob, "image.png");
+
+        const response = await axios.post("/api/step/", formData, {
+            headers: {
+                "Content-Type": "multipart/form-data",
+            },
+        });
+
+        if (response.data.success) {
+            let inputImageData = response.data.data.input_image;
+            let sourceImageData = response.data.data.source_image;
+
+            debugInputImageElement.src = `data:image/png;base64,${inputImageData}`;
+            debugReferenceImageElement.src = `data:image/png;base64,${sourceImageData}`;
+        }
+
+        return response.data;
 
         // Put mat 
         this.inputImageMat = cv.imread(inputImageElement);
@@ -105,7 +138,7 @@ class WatVision {
     }
 
     doesSourceImageExist() {
-        return this.sourceImageMat !== null;
+        return this.sourceImageCaptured;
     }
 
     detectHands(inputImageElement) {
@@ -168,7 +201,15 @@ class WatVision {
             imgBlob = await imgSrcResponse.blob();
         } else if (inputElement instanceof HTMLCanvasElement) {
             // Handle <canvas> element
-            imgBlob = await new Promise(resolve => inputElement.toBlob(resolve, "image/jpeg"));
+            imgBlob = await new Promise(resolve => {
+                inputElement.toBlob(blob => {
+                    if (blob) {
+                        resolve(blob);
+                    } else {
+                        throw new Error("Failed to create blob from canvas element.");
+                    }
+                }, "image/png");
+            });
         } else {
             throw new Error("Input must be an image or canvas element.");
         }
