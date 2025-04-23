@@ -46,26 +46,6 @@ class WatVision {
         return true;
     }
 
-    async init() {
-        if (this.initiating) return false;
-
-        this.initiating = true;
-
-        let initVisionPromise = this.initVision();
-
-        // aync wait for cv to be ready inline
-        let initCVPromise = new Promise((resolve) => {
-            cv["onRuntimeInitialized"] = () => {
-                console.log("Open CV is ready setting variable");
-                resolve();
-            };
-        });
-
-        await Promise.all([initVisionPromise, initCVPromise]);
-
-        return true;
-    }
-
     async captureSourceImage(inputImageElement) {
         let imgBlob = await this.getImageBlob(inputImageElement);
 

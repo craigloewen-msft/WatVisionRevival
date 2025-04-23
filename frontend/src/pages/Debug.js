@@ -11,17 +11,7 @@ function Debug() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [watVision, setWatVision] = useState(null);
-
-  useEffect(() => {
-    async function initWatVision() {
-      let watVision = new WatVision();
-      let result = await watVision.init();
-      setWatVision(watVision);
-    }
-
-    initWatVision();
-  }, []);
+  const watVision = new WatVision();
 
   useEffect(() => {
     if (!watVision) {
@@ -30,6 +20,7 @@ function Debug() {
     } else {
       console.log("Vision ready now");
     }
+    setLoading(false);
 
     async function processImage() {
       const currentImageElement = imageRef.current;
@@ -50,7 +41,6 @@ function Debug() {
         setError(err);
       }
 
-      setLoading(false);
     }
 
     const imgElement = imageRef.current;

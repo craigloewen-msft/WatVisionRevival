@@ -72,19 +72,61 @@ class VisionInstance:
         return True
 
     def step(self, input_image: np.ndarray):
+        import time
+        start_time = time.time()
+        timing_data = {}
+
         self.input_image = input_image
         self.input_debug_image = input_image.copy()
         self.source_debug_image = self.source_image.copy()
 
+        # Time hands detection
+        hands_start = time.time()
         hands_info = self.__detect_hands(self.input_image)
+        hands_end = time.time()
+        timing_data['hands_detection'] = hands_end - hands_start
 
+        # Time homography calculation
+        homography_start = time.time()
         homography = self.__get_homography(self.input_image, self.source_image)
+        homography_end = time.time()
+        timing_data['homography'] = homography_end - homography_start
 
+        # Time finger tip location calculation
+        fingertip_start = time.time()
         input_finger_tip_location, source_finger_tip_location = self.__get_finger_tip_location(hands_info, homography, self.input_image)
+        fingertip_end = time.time()
+        timing_data['finger_tip_location'] = fingertip_end - fingertip_start
 
+        # Time debug info drawing
+        debug_start = time.time()
         self.__draw_debug_info(self.input_debug_image, self.source_debug_image, homography, hands_info, input_finger_tip_location, source_finger_tip_location)
+        debug_end = time.time()
+        timing_data['draw_debug_info'] = debug_end - debug_start
+
+        # Calculate total time
+        end_time = time.time()
+        total_time = end_time - start_time
+
+        # Print timing table
+        self.__print_timing_table(timing_data, total_time)
 
         return self.input_debug_image, self.source_debug_image
+
+    def __print_timing_table(self, timing_data, total_time):
+        """Prints a formatted table of timing data"""
+        print("\n--- Performance Timing ---")
+        print(f"{'Function':<25} {'Time (ms)':<15} {'Percentage':<10}")
+        print("-" * 50)
+        
+        for func_name, time_taken in timing_data.items():
+            ms_time = time_taken * 1000  # Convert to milliseconds
+            percentage = (time_taken / total_time) * 100
+            print(f"{func_name:<25} {ms_time:<15.2f} {percentage:<10.2f}%")
+        
+        print("-" * 50)
+        print(f"{'Total':<25} {(total_time * 1000):<15.2f} {'100.00':<10}%")
+        print("-------------------------\n")
 
     def __detect_hands(self, input_image):
 
@@ -164,14 +206,27 @@ class VisionInstance:
         return None
     
     def __get_homography(self, input_image, source_image):
-        output0 = self.xfeat.detectAndCompute(source_image, top_k = 4096)[0]
-        output1 = self.xfeat.detectAndCompute(input_image, top_k = 4096)[0]
+        # Resize images to half size for faster processing
+        resize_factor = 0.5
+        input_image_resized = cv2.resize(input_image, None, fx=resize_factor, fy=resize_factor)
+        source_image_resized = cv2.resize(source_image, None, fx=resize_factor, fy=resize_factor)
+        
+        # Detect and compute on resized images
+        output0 = self.xfeat.detectAndCompute(source_image_resized, top_k = 4096)[0]
+        output1 = self.xfeat.detectAndCompute(input_image_resized, top_k = 4096)[0]
 
+        # Set the image size to the original dimensions
         output0.update({'image_size': (source_image.shape[1], source_image.shape[0])})
         output1.update({'image_size': (input_image.shape[1], input_image.shape[0])})
         
+        # Match features
         mkpts_0, mkpts_1, other = self.xfeat.match_lighterglue(output0, output1)
+        
+        # Scale keypoints back to original image size
+        mkpts_0 = mkpts_0 / resize_factor
+        mkpts_1 = mkpts_1 / resize_factor
 
+        # Calculate homography and create visualization
         canvas, homography = warp_corners_and_draw_matches(mkpts_0, mkpts_1, source_image, input_image)
 
         # Save the concatenated image with matches
@@ -179,11 +234,6 @@ class VisionInstance:
         cv2.imwrite(concatenated_image_path, canvas)
 
         return homography
-
-        # # Convert homography matrix to a np array
-        # homography = np.array(homography).tolist()
-
-        # return json.dumps(homography)
     
     def __get_text_info(self, input_image):
         # Input is expected to be a file-like object with 'mimetype' and 'buffer' attributes

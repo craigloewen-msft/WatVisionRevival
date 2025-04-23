@@ -7,7 +7,8 @@ function DebugVideo() {
     const debugInputImageRef = useRef(null);
     const debugReferenceImageRef = useRef(null);
 
-    const [watVision, setWatVision] = useState(null);
+    const watVision = new WatVision();
+
     const [videoLoaded, setVideoLoaded] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -29,22 +30,6 @@ function DebugVideo() {
         return () => {
             videoEl.removeEventListener("loadeddata", handleLoadedData);
         };
-    }, []);
-
-    // Initialize WatVision
-    useEffect(() => {
-        async function initWatVision() {
-            try {
-                let vision = new WatVision();
-                await vision.init();
-                setWatVision(vision);
-                console.log("WatVision initialized successfully");
-            } catch (err) {
-                console.error("Failed to initialize WatVision:", err);
-                setError(err);
-            }
-        }
-        initWatVision();
     }, []);
 
     // Capture initial source image when "Capture Source" button is clicked
