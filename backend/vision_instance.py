@@ -206,6 +206,98 @@ class VisionInstance:
         return None
     
     def __get_homography(self, input_image, source_image):
+        # Default to use xfeat for homography
+        return self.__get_homography_sift(input_image, source_image)
+    
+    def __get_homography_orb(self, input_image, source_image):
+        # Create ORB detector
+        orb = cv2.ORB_create(nfeatures=2000)
+        
+        # Detect keypoints and compute descriptors
+        kp1, des1 = orb.detectAndCompute(source_image, None)
+        kp2, des2 = orb.detectAndCompute(input_image, None)
+        
+        # Create matcher
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        
+        # Match descriptors
+        matches = bf.match(des1, des2)
+        
+        # Sort matches by distance
+        matches = sorted(matches, key=lambda x: x.distance)
+        
+        # Use top matches (adjust as needed)
+        good_matches = matches[:100]
+        
+        # Extract location of good matches
+        src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+        dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+        
+        # Calculate Homography
+        H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+        
+        # Draw matches for debug visualization
+        match_img = cv2.drawMatches(source_image, kp1, input_image, kp2, good_matches, None, 
+                                    flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        
+        # Save the concatenated image with matches
+        concatenated_image_path = os.path.join(os.getcwd(), 'concatenated_image_with_matches.jpg')
+        cv2.imwrite(concatenated_image_path, match_img)
+        
+        return H
+    
+    def __get_homography_sift(self, input_image, source_image):
+        # Create SIFT detector
+        sift = cv2.SIFT_create()
+        
+        # Detect keypoints and compute descriptors
+        kp1, des1 = sift.detectAndCompute(source_image, None)
+        kp2, des2 = sift.detectAndCompute(input_image, None)
+        
+        # FLANN parameters
+        FLANN_INDEX_KDTREE = 1
+        index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
+        search_params = dict(checks=50)
+        
+        # Create FLANN matcher
+        flann = cv2.FlannBasedMatcher(index_params, search_params)
+        
+        # Match descriptors
+        matches = flann.knnMatch(des1, des2, k=2)
+        
+        # Apply ratio test
+        good_matches = []
+        for m, n in matches:
+            if m.distance < 0.7 * n.distance:
+                good_matches.append(m)
+        
+        # Extract location of good matches
+        if len(good_matches) > 10:
+            src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+            dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+            
+            # Calculate Homography
+            H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+            
+            # Draw matches for debug visualization
+            match_mask = mask.ravel().tolist()
+            draw_params = dict(matchColor=(0, 255, 0),
+                               singlePointColor=None,
+                               matchesMask=match_mask,
+                               flags=2)
+            
+            match_img = cv2.drawMatches(source_image, kp1, input_image, kp2, good_matches, None, **draw_params)
+            
+            # Save the concatenated image with matches
+            concatenated_image_path = os.path.join(os.getcwd(), 'concatenated_image_with_matches.jpg')
+            cv2.imwrite(concatenated_image_path, match_img)
+            
+            return H
+        else:
+            print("Not enough good matches found for SIFT homography")
+            return None
+    
+    def __get_homography_xfeat(self, input_image, source_image):
         # Resize images to half size for faster processing
         resize_factor = 0.5
         input_image_resized = cv2.resize(input_image, None, fx=resize_factor, fy=resize_factor)
