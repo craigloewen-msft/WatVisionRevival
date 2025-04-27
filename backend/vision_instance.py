@@ -55,11 +55,13 @@ class VisionInstance:
         self.input_debug_image = None
         self.source_debug_image = None
 
+        self.text_info = None
+
         self.hands_detector = hands_detector
 
         self.xfeat = torch.hub.load('verlab/accelerated_features', 'XFeat', pretrained = True, top_k = 4096)
 
-        data_path = os.path.join(os.path.dirname(__file__), 'test_data_screen.json')
+        data_path = os.path.join(os.path.dirname(__file__), 'test_data_video.json')
         with open(data_path, 'r') as file:
             self.test_data = json.load(file)
 
@@ -157,10 +159,9 @@ class VisionInstance:
             return None, None
     
     def __draw_debug_info(self, input_image, source_image, homography, hands_info, input_finger_tip_location, source_finger_tip_location):
-        # Placeholder for drawing debug information
-
         self.__draw_source_on_input(self.input_debug_image, self.source_debug_image, homography)
         self.__draw_hands(self.input_debug_image, self.source_debug_image, hands_info, input_finger_tip_location, source_finger_tip_location)
+        self.__draw_text_data(self.input_debug_image, self.source_debug_image, self.text_info, homography)
     
     def __draw_source_on_input(self, input_debug_mat, source_debug_mat, homography):
         # Get the dimensions of the source debug matrix
@@ -202,8 +203,64 @@ class VisionInstance:
                         5, (255, 0, 0, 255), -1)
                 
     def __draw_text_data(self, input_debug_image, source_debug_image, image_text_data, homography):
-        # TODO
-        return None
+        if not image_text_data:
+            return None
+
+        # Get current image dimensions
+        source_height, source_width = source_debug_image.shape[:2]
+        input_height, input_width = input_debug_image.shape[:2]
+
+        # Get the original analyzed image dimensions from the text_data
+        if 'readResults' in image_text_data and len(image_text_data['readResults']) > 0:
+            original_width = image_text_data['readResults'][0]['width']
+            original_height = image_text_data['readResults'][0]['height']
+            
+            # Draw text boxes and text on source image
+            for read_result in image_text_data['readResults']:
+                if 'lines' in read_result:
+                    for line in read_result['lines']:
+                        if 'boundingBox' in line:
+                            # Extract bounding box points
+                            bbox = line['boundingBox']
+                            # Convert bounding box format from [x1,y1,x2,y2,x3,y3,x4,y4] to points
+                            original_points = np.array([
+                                [bbox[0] / original_width, bbox[1] / original_height],
+                                [bbox[2] / original_width, bbox[3] / original_height],
+                                [bbox[4] / original_width, bbox[5] / original_height],
+                                [bbox[6] / original_width, bbox[7] / original_height]
+                            ], dtype=np.float32)
+
+                            # Scale points to source image dimensions
+                            points = (original_points * np.array([source_width, source_height])).astype(np.int32).reshape(-1, 1, 2)
+                            
+                            # Draw polygon on source image
+                            cv2.polylines(source_debug_image, [points], isClosed=True, color=(0, 0, 255), thickness=2)
+                            
+                            # Draw text
+                            if 'text' in line:
+                                text = line['text']
+                                # Get top-left corner of bounding box for text placement
+                                text_position = (bbox[0], bbox[1] - 10)
+                                cv2.putText(source_debug_image, text, text_position, 
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                            
+                            # Transform the bounding box to input image coordinates using homography
+                            points_float = points.astype(np.float32).reshape(-1, 1, 2)
+                            transformed_points = cv2.perspectiveTransform(points_float, homography)
+                            transformed_points = transformed_points.astype(np.int32)
+                            
+                            # Draw transformed polygon on input image
+                            cv2.polylines(input_debug_image, [transformed_points], isClosed=True, color=(0, 0, 255), thickness=2)
+                            
+                            # Draw transformed text
+                            if 'text' in line:
+                                text = line['text']
+                                # Get top-left corner of transformed bounding box for text placement
+                                transformed_text_position = (transformed_points[0][0][0], transformed_points[0][0][1] - 10)
+                                cv2.putText(input_debug_image, text, transformed_text_position, 
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+        
+        return input_debug_image, source_debug_image
     
     def __get_homography(self, input_image, source_image):
         # Default to use xfeat for homography
