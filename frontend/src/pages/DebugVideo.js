@@ -14,9 +14,9 @@ function DebugVideo() {
     const [error, setError] = useState(null);
     const [isSourceCaptured, setIsSourceCaptured] = useState(false);
     const [processingActive, setProcessingActive] = useState(false);
-    const processingRef = useRef(false); // Use a ref to track processing state across renders
+        const processingRef = useRef(false); // Use a ref to track processing state across renders
 
-    // Handle video loading
+        // Handle video loading
     useEffect(() => {
         const videoEl = videoRef.current;
         if (!videoEl) return;
@@ -156,7 +156,7 @@ function DebugVideo() {
                     </button>
                 </div>
             </div>
-            <div className="row">
+                        <div className="row">
                 <div className="col-6">
                     <h3>Input Video</h3>
                     <video

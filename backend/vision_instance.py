@@ -99,6 +99,14 @@ class VisionInstance:
         input_finger_tip_location, source_finger_tip_location = self.__get_finger_tip_location(hands_info, homography, self.input_image)
         fingertip_end = time.time()
         timing_data['finger_tip_location'] = fingertip_end - fingertip_start
+        
+        # Store the latest source finger position and check for text under finger
+        text_under_finger = None
+        if source_finger_tip_location:
+            self.latest_source_finger_position = source_finger_tip_location
+            text_under_finger = self.get_text_under_finger(source_finger_tip_location)
+            if text_under_finger:
+                print(f"Text under finger: {text_under_finger['text']}")
 
         # Time debug info drawing
         debug_start = time.time()
@@ -113,7 +121,7 @@ class VisionInstance:
         # Print timing table
         self.__print_timing_table(timing_data, total_time)
 
-        return self.input_debug_image, self.source_debug_image
+        return self.input_debug_image, self.source_debug_image, text_under_finger
 
     def __print_timing_table(self, timing_data, total_time):
         """Prints a formatted table of timing data"""
@@ -264,7 +272,7 @@ class VisionInstance:
     
     def __get_homography(self, input_image, source_image):
         # Default to use xfeat for homography
-        return self.__get_homography_sift(input_image, source_image)
+        return self.__get_homography_xfeat(input_image, source_image)
     
     def __get_homography_orb(self, input_image, source_image):
         # Create ORB detector
@@ -355,14 +363,15 @@ class VisionInstance:
             return None
     
     def __get_homography_xfeat(self, input_image, source_image):
-        # Resize images to half size for faster processing
-        resize_factor = 0.5
+        # Resize images to smaller size for faster processing
+        resize_factor = 0.4  # Reduce to 40% of original size
         input_image_resized = cv2.resize(input_image, None, fx=resize_factor, fy=resize_factor)
         source_image_resized = cv2.resize(source_image, None, fx=resize_factor, fy=resize_factor)
         
-        # Detect and compute on resized images
-        output0 = self.xfeat.detectAndCompute(source_image_resized, top_k = 4096)[0]
-        output1 = self.xfeat.detectAndCompute(input_image_resized, top_k = 4096)[0]
+        # Detect and compute on resized images with fewer features
+        top_k = 2048  # Reduce from 4096 to 2048 features
+        output0 = self.xfeat.detectAndCompute(source_image_resized, top_k=top_k)[0]
+        output1 = self.xfeat.detectAndCompute(input_image_resized, top_k=top_k)[0]
 
         # Set the image size to the original dimensions
         output0.update({'image_size': (source_image.shape[1], source_image.shape[0])})
@@ -375,14 +384,18 @@ class VisionInstance:
         mkpts_0 = mkpts_0 / resize_factor
         mkpts_1 = mkpts_1 / resize_factor
 
-        # Calculate homography and create visualization
-        canvas, homography = warp_corners_and_draw_matches(mkpts_0, mkpts_1, source_image, input_image)
+        # Calculate homography using USAC_FAST algorithm with fewer iterations
+        H, mask = cv2.findHomography(mkpts_0, mkpts_1, cv2.USAC_FAST, 3.0, maxIters=500, confidence=0.995)
+        
+        # Only generate visualization in debug mode or when needed
+        if os.environ.get('DEBUG_VISUALIZATION', '0') == '1':
+            # Calculate homography and create visualization
+            canvas, _ = warp_corners_and_draw_matches(mkpts_0, mkpts_1, source_image, input_image)
+            # Save the concatenated image with matches
+            concatenated_image_path = os.path.join(os.getcwd(), 'concatenated_image_with_matches.jpg')
+            cv2.imwrite(concatenated_image_path, canvas)
 
-        # Save the concatenated image with matches
-        concatenated_image_path = os.path.join(os.getcwd(), 'concatenated_image_with_matches.jpg')
-        cv2.imwrite(concatenated_image_path, canvas)
-
-        return homography
+        return H
     
     def __get_text_info(self, input_image):
         # Input is expected to be a file-like object with 'mimetype' and 'buffer' attributes
@@ -403,3 +416,65 @@ class VisionInstance:
         #     return None
 
         return self.test_data
+        
+    def get_text_under_finger(self, finger_position=None):
+        """
+        Identifies which text element the finger is hovering over.
+        
+        Args:
+            finger_position (dict): Contains 'x' and 'y' coordinates of the fingertip in the source image space.
+                                    If None, uses the most recently detected finger position.
+        
+        Returns:
+            dict: Contains the text content and bounding box information, or None if no text is under the finger.
+        """
+        if not self.text_info or not finger_position:
+            return None
+            
+        # Use the most recent finger position if none provided
+        if finger_position is None and hasattr(self, 'latest_source_finger_position'):
+            finger_position = self.latest_source_finger_position
+            
+        if not finger_position:
+            return None
+            
+        x, y = finger_position['x'], finger_position['y']
+        
+        # Get image dimensions
+        if 'readResults' in self.text_info and len(self.text_info['readResults']) > 0:
+            original_width = self.text_info['readResults'][0]['width']
+            original_height = self.text_info['readResults'][0]['height']
+            
+            # Current image dimensions
+            source_height, source_width = self.source_image.shape[:2]
+            
+            # Check each text element to see if finger is inside its bounding box
+            for read_result in self.text_info['readResults']:
+                if 'lines' in read_result:
+                    for line in read_result['lines']:
+                        if 'boundingBox' in line:
+                            # Extract bounding box points
+                            bbox = line['boundingBox']
+                            
+                            # Convert bounding box format from [x1,y1,x2,y2,x3,y3,x4,y4] to points
+                            original_points = np.array([
+                                [bbox[0] / original_width, bbox[1] / original_height],
+                                [bbox[2] / original_width, bbox[3] / original_height],
+                                [bbox[4] / original_width, bbox[5] / original_height],
+                                [bbox[6] / original_width, bbox[7] / original_height]
+                            ], dtype=np.float32)
+                            
+                            # Scale points to current image dimensions
+                            points = (original_points * np.array([source_width, source_height])).astype(np.int32)
+                            
+                            # Check if point is inside polygon
+                            if cv2.pointPolygonTest(points, (x, y), False) >= 0:
+                                # Point is inside the polygon
+                                return {
+                                    'text': line['text'],
+                                    'confidence': line.get('confidence', 0.0),
+                                    'boundingBox': points.tolist()
+                                }
+        
+        # No text found under finger
+        return None

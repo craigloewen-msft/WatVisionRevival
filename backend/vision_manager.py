@@ -69,7 +69,7 @@ class VisionManager:
 
         input_image = self.__get_cv_image_from_input(input_image)
 
-        input_image, source_image = self.visionInstanceList[0].step(input_image)
+        input_image, source_image, text_under_finger = self.visionInstanceList[0].step(input_image)
 
         # Convert np.ndarray to base64-encoded strings
         _, input_image_encoded = cv2.imencode('.jpg', input_image)
@@ -81,5 +81,6 @@ class VisionManager:
         # Return as JSON-serializable dictionary
         return {
             "input_image": input_image_base64,
-            "source_image": source_image_base64
+            "source_image": source_image_base64,
+            "text_under_finger": text_under_finger
         }

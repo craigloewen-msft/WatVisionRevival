@@ -10,7 +10,7 @@ function Debug() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
+  
   const watVision = new WatVision();
 
   useEffect(() => {
@@ -55,7 +55,7 @@ function Debug() {
     <div className="container">
       {/* Load image from the public directory */}
       <h3>Debug page</h3>
-      <div className="row">
+            <div className="row">
         <div>
           {loading ? (
             <p>Loading...</p>
