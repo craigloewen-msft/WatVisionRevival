@@ -2,3 +2,10 @@ transformers
 torch
 requests
 Pillow
+flask
+azure-cognitiveservices-vision-computervision
+opencv-python
+matplotlib
+mediapipe
+dotenv
+kornia

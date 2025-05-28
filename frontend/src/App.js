@@ -6,6 +6,7 @@ import DebugVideo from "./pages/DebugVideo";
 import DebugCamera from "./pages/DebugCamera";
 import "./App.css";
 import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap/dist/js/bootstrap.bundle.min.js";
 
 function App() {
   return (
@@ -13,7 +14,15 @@ function App() {
       <div className="container text-center">
         <nav className="navbar navbar-expand-lg">
           <NavLink className="navbar-brand" to="/">WatVision</NavLink>
-          <button className="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <button 
+            className="navbar-toggler" 
+            type="button" 
+            data-bs-toggle="collapse" 
+            data-bs-target="#navbarNav" 
+            aria-controls="navbarNav" 
+            aria-expanded="false" 
+            aria-label="Toggle navigation"
+          >
             <span className="navbar-toggler-icon"></span>
           </button>
           <div className="collapse navbar-collapse" id="navbarNav">

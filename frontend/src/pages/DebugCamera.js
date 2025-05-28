@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import WatVision from "../js/watvision";
 
 function DebugCamera() {
@@ -6,16 +6,25 @@ function DebugCamera() {
     const videoCanvas = useRef(null);
     const debugInputImageRef = useRef(null);
     const debugReferenceImageRef = useRef(null);
+    
+    // Use useMemo to prevent recreation of WatVision instance on each render
+    const watVision = useMemo(() => new WatVision(), []);
 
-    const [watVision, setWatVision] = useState(null);
     const [videoLoaded, setVideoLoaded] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [isSourceCaptured, setIsSourceCaptured] = useState(false);
+    const [processingActive, setProcessingActive] = useState(false);
+    const processingRef = useRef(false); // Use a ref to track processing state across renders
 
     // Request webcam access and set the video element's source
     useEffect(() => {
         async function setupWebcam() {
             try {
+                if (!navigator.mediaDevices) {
+                    throw new Error("Media Devices API not supported in this browser or requires HTTPS/localhost context");
+                }
+                
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
@@ -34,6 +43,7 @@ function DebugCamera() {
         if (!videoEl) return;
 
         const handleLoadedData = () => {
+            console.log("Video data loaded");
             setVideoLoaded(true);
         };
 
@@ -43,64 +53,92 @@ function DebugCamera() {
         };
     }, []);
 
-    useEffect(() => {
-        async function initWatVision() {
-            let vision = new WatVision();
-            await vision.init();
-            setWatVision(vision);
-        }
-        initWatVision();
-    }, []);
+    // Capture initial source image when "Capture Source" button is clicked
+    const captureSource = async () => {
+        if (!watVision || !videoLoaded) return;
 
-    useEffect(() => {
-        if (!watVision || !videoLoaded) {
-            console.log("Vision not ready yet");
-            return;
-        }
         const videoEl = videoRef.current;
         const videoCanvasEl = videoCanvas.current;
-        if (!videoEl) return;
+        
+        try {
+            // Draw the current video frame to canvas
+            videoCanvasEl.width = videoEl.videoWidth;
+            videoCanvasEl.height = videoEl.videoHeight;
+            const ctx = videoCanvasEl.getContext("2d");
+            ctx.drawImage(videoEl, 0, 0, videoEl.videoWidth, videoEl.videoHeight);
+            
+            // Capture this frame as the source image
+            await watVision.captureSourceImage(videoCanvasEl);
+            setIsSourceCaptured(true);
+            console.log("Source image captured successfully");
+        } catch (err) {
+            console.error("Error capturing source image:", err);
+            setError(err);
+        }
+    };
 
-        // Process webcam stream frames
+    // Toggle video processing on/off
+    const toggleProcessing = () => {
+        setProcessingActive(prev => !prev);
+    };
+
+    // Process video frames
+    useEffect(() => {
+        if (!watVision || !videoLoaded || !isSourceCaptured || !processingActive) {
+            return;
+        }
+
+        const videoEl = videoRef.current;
+        const videoCanvasEl = videoCanvas.current;
+        if (!videoEl || !videoCanvasEl) return;
+
+        let animationFrameId;
+        
         const processFrame = async () => {
-            if (videoEl.paused || videoEl.ended) return;
+            // Skip if we're already processing a frame or video has ended
+            if (processingRef.current || videoEl.ended || videoEl.paused) {
+                animationFrameId = requestAnimationFrame(processFrame);
+                return;
+            }
+
+            processingRef.current = true;
+            
             try {
+                // Draw the current video frame to canvas
                 videoCanvasEl.width = videoEl.videoWidth;
                 videoCanvasEl.height = videoEl.videoHeight;
-                const videoCanvasContext = videoCanvasEl.getContext("2d");
-                videoCanvasContext.drawImage(videoEl, 0, 0, videoEl.videoWidth, videoEl.videoHeight);
-
-                // Capture the first frame as the source reference image, if not already set.
-                if (!watVision.doesSourceImageExist()) {
-                    try {
-                        await watVision.captureSourceImage(videoCanvasEl);
-                    } catch (err) {
-                        console.error(err);
-                        setError(err);
-                    }
-                }
-
-                // Process the current frame with watVision
-                watVision.step(
+                const ctx = videoCanvasEl.getContext("2d", { willReadFrequently: true });
+                ctx.drawImage(videoEl, 0, 0, videoEl.videoWidth, videoEl.videoHeight);
+                
+                // Process this frame with WatVision
+                await watVision.step(
                     videoCanvasEl,
                     debugInputImageRef.current,
                     debugReferenceImageRef.current
                 );
+                
+                setLoading(false);
             } catch (err) {
-                console.error(err);
+                console.error("Error processing frame:", err);
                 setError(err);
+            } finally {
+                processingRef.current = false;
+                animationFrameId = requestAnimationFrame(processFrame);
             }
-            requestAnimationFrame(processFrame);
         };
-
-        // Start processing frames
-        processFrame();
-        setLoading(false);
-    }, [watVision, videoLoaded]);
+        
+        // Start the frame processing loop
+        animationFrameId = requestAnimationFrame(processFrame);
+        
+        // Cleanup function
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+        };
+    }, [watVision, videoLoaded, isSourceCaptured, processingActive]);
 
     return (
         <div className="container">
-            <h3>Debug page</h3>
+            <h3>Debug Camera</h3>
             <div className="row">
                 <div>
                     {loading ? (
@@ -110,12 +148,27 @@ function DebugCamera() {
                     ) : null}
                 </div>
             </div>
+            <div className="row mb-3">
+                <div className="col-12">
+                    <button 
+                        className="btn btn-primary mr-2" 
+                        onClick={captureSource}
+                        disabled={!watVision || !videoLoaded || isSourceCaptured}>
+                        Capture Source Frame
+                    </button>
+                    <button 
+                        className={`btn ${processingActive ? 'btn-danger' : 'btn-success'} ml-2`} 
+                        onClick={toggleProcessing}
+                        disabled={!isSourceCaptured}>
+                        {processingActive ? 'Stop Processing' : 'Start Processing'}
+                    </button>
+                </div>
+            </div>
             <div className="row">
                 <div className="col-6">
                     <h3>Webcam Input</h3>
                     <video
                         ref={videoRef}
-                        // Removed src attribute as we use webcam stream instead.
                         className="img-fluid"
                         muted
                         autoPlay
@@ -131,11 +184,11 @@ function DebugCamera() {
             <div className="row">
                 <div className="col-6">
                     <h3>Debug Input Image</h3>
-                    <canvas className="img-fluid" ref={debugInputImageRef} />
+                    <img ref={debugInputImageRef} className="img-fluid" alt="Input with processing" />
                 </div>
                 <div className="col-6">
                     <h3>Debug Source Image</h3>
-                    <canvas className="img-fluid" ref={debugReferenceImageRef} />
+                    <img ref={debugReferenceImageRef} className="img-fluid" alt="Source reference" />
                 </div>
             </div>
         </div>
