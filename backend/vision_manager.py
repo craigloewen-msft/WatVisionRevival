@@ -44,7 +44,7 @@ class VisionManager:
                                             num_hands=1)
         detector = vision.HandLandmarker.create_from_options(options)
 
-        self.visionInstanceList = [ VisionInstance(detector) ]
+        self.visionInstanceList = [ VisionInstance(detector, self.computer_vision_client) ]
 
     def __get_cv_image_from_input(self, input_image):
         # Convert the input image to a format OpenCV can process directly
@@ -61,9 +61,22 @@ class VisionManager:
 
     def set_source_image(self, source):
         source_image = self.__get_cv_image_from_input(source)
+        
+        # Create a directory for uploaded images if it doesn't exist
+        upload_dir = '/tmp/'
+        
+        # Generate a secure filename and save the image to disk
+        filename = secure_filename(source.filename)
+        filepath = os.path.join(upload_dir, filename)
+        
+        # Convert RGB back to BGR for saving with cv2
+        source_image_bgr = cv2.cvtColor(source_image, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(filepath, source_image_bgr)
 
-        # Set the source image in the VisionInstance
-        return self.visionInstanceList[0].set_source_image(source_image)
+        # TODO add code to fix handling the image
+
+        # Set the source image in the VisionInstance with the file path
+        return self.visionInstanceList[0].set_source_image(source_image, filepath)
     
     def step(self, input_image):
 

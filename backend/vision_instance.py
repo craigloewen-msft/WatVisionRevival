@@ -1,3 +1,4 @@
+import time
 import cv2
 import numpy as np
 import torch
@@ -11,6 +12,8 @@ import matplotlib.pyplot as plt
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+
+from azure.cognitiveservices.vision.computervision import ComputerVisionClient
 
 HAND_CONNECTIONS = mp.solutions.hands.HAND_CONNECTIONS
 
@@ -48,7 +51,7 @@ def warp_corners_and_draw_matches(ref_points, dst_points, img1, img2):
 
 class VisionInstance:
 
-    def __init__(self, hands_detector):
+    def __init__(self, hands_detector, computer_vision_client: ComputerVisionClient):
         self.source_image = None
         self.input_image = None
 
@@ -59,17 +62,19 @@ class VisionInstance:
 
         self.hands_detector = hands_detector
 
+        self.computer_vision_client = computer_vision_client
+
         self.xfeat = torch.hub.load('verlab/accelerated_features', 'XFeat', pretrained = True, top_k = 4096)
 
         data_path = os.path.join(os.path.dirname(__file__), 'test_data_video.json')
         with open(data_path, 'r') as file:
             self.test_data = json.load(file)
 
-    def set_source_image(self, source_image: np.ndarray):
+    def set_source_image(self, source_image: np.ndarray, image_path):
         self.source_image = source_image
         self.source_debug_image = source_image.copy()
 
-        self.text_info = self.__get_text_info(source_image)
+        self.text_info = self.__get_text_info(image_path)
 
         return True
 
@@ -110,7 +115,7 @@ class VisionInstance:
 
         # Time debug info drawing
         debug_start = time.time()
-        self.__draw_debug_info(self.input_debug_image, self.source_debug_image, homography, hands_info, input_finger_tip_location, source_finger_tip_location)
+        self.__draw_debug_info(self.input_debug_image, self.source_debug_image, homography, hands_info, input_finger_tip_location, source_finger_tip_location, text_under_finger)
         debug_end = time.time()
         timing_data['draw_debug_info'] = debug_end - debug_start
 
@@ -166,10 +171,10 @@ class VisionInstance:
         else:
             return None, None
     
-    def __draw_debug_info(self, input_image, source_image, homography, hands_info, input_finger_tip_location, source_finger_tip_location):
+    def __draw_debug_info(self, input_image, source_image, homography, hands_info, input_finger_tip_location, source_finger_tip_location, text_under_finger):
         self.__draw_source_on_input(self.input_debug_image, self.source_debug_image, homography)
         self.__draw_hands(self.input_debug_image, self.source_debug_image, hands_info, input_finger_tip_location, source_finger_tip_location)
-        self.__draw_text_data(self.input_debug_image, self.source_debug_image, self.text_info, homography)
+        self.__draw_text_data(self.input_debug_image, self.source_debug_image, self.text_info, homography, text_under_finger)
     
     def __draw_source_on_input(self, input_debug_mat, source_debug_mat, homography):
         # Get the dimensions of the source debug matrix
@@ -210,7 +215,7 @@ class VisionInstance:
                         (int(source_finger_tip_location['x']), int(source_finger_tip_location['y'])), 
                         5, (255, 0, 0, 255), -1)
                 
-    def __draw_text_data(self, input_debug_image, source_debug_image, image_text_data, homography):
+    def __draw_text_data(self, input_debug_image, source_debug_image, image_text_data, homography, text_under_finger):
         if not image_text_data:
             return None
 
@@ -219,17 +224,15 @@ class VisionInstance:
         input_height, input_width = input_debug_image.shape[:2]
 
         # Get the original analyzed image dimensions from the text_data
-        if 'readResults' in image_text_data and len(image_text_data['readResults']) > 0:
-            original_width = image_text_data['readResults'][0]['width']
-            original_height = image_text_data['readResults'][0]['height']
+        if len(image_text_data) > 0:
+            original_width = image_text_data[0].width
+            original_height = image_text_data[0].height
             
             # Draw text boxes and text on source image
-            for read_result in image_text_data['readResults']:
-                if 'lines' in read_result:
-                    for line in read_result['lines']:
-                        if 'boundingBox' in line:
+            for read_result in image_text_data:
+                    for line in read_result.lines:
                             # Extract bounding box points
-                            bbox = line['boundingBox']
+                            bbox = line.bounding_box
                             # Convert bounding box format from [x1,y1,x2,y2,x3,y3,x4,y4] to points
                             original_points = np.array([
                                 [bbox[0] / original_width, bbox[1] / original_height],
@@ -245,12 +248,11 @@ class VisionInstance:
                             cv2.polylines(source_debug_image, [points], isClosed=True, color=(0, 0, 255), thickness=2)
                             
                             # Draw text
-                            if 'text' in line:
-                                text = line['text']
-                                # Get top-left corner of bounding box for text placement
-                                text_position = (bbox[0], bbox[1] - 10)
-                                cv2.putText(source_debug_image, text, text_position, 
-                                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                            text = line.text
+                            # Get top-left corner of bounding box for text placement
+                            text_position = (int(bbox[0]), int(bbox[1]) - 10)
+                            cv2.putText(source_debug_image, text, text_position, 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
                             
                             # Transform the bounding box to input image coordinates using homography
                             points_float = points.astype(np.float32).reshape(-1, 1, 2)
@@ -261,13 +263,36 @@ class VisionInstance:
                             cv2.polylines(input_debug_image, [transformed_points], isClosed=True, color=(0, 0, 255), thickness=2)
                             
                             # Draw transformed text
-                            if 'text' in line:
-                                text = line['text']
-                                # Get top-left corner of transformed bounding box for text placement
-                                transformed_text_position = (transformed_points[0][0][0], transformed_points[0][0][1] - 10)
-                                cv2.putText(input_debug_image, text, transformed_text_position, 
-                                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                            text = line.text
+                            # Get top-left corner of transformed bounding box for text placement
+                            transformed_text_position = (transformed_points[0][0][0], transformed_points[0][0][1] - 10)
+                            cv2.putText(input_debug_image, text, transformed_text_position, 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
         
+        # Draw text under finger if available
+        if text_under_finger:
+            bbox = text_under_finger['boundingBox']
+            # Draw bounding box on source image
+            cv2.polylines(source_debug_image, [np.array(bbox)], isClosed=True, color=(0, 255, 0), thickness=2)
+            
+            # Draw text on source image
+            text_position = (bbox[0][0], bbox[0][1] - 10)
+            cv2.putText(source_debug_image, text_under_finger['text'], text_position, 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+            
+            # Transform the bounding box to input image coordinates using homography
+            bbox_float = np.array(bbox).astype(np.float32).reshape(-1, 1, 2)
+            transformed_bbox = cv2.perspectiveTransform(bbox_float, homography)
+            transformed_bbox = transformed_bbox.astype(np.int32)
+            
+            # Draw transformed bounding box on input image
+            cv2.polylines(input_debug_image, [transformed_bbox], isClosed=True, color=(0, 255, 0), thickness=2)
+            
+            # Draw transformed text
+            transformed_text_position = (transformed_bbox[0][0][0], transformed_bbox[0][0][1] - 10)
+            cv2.putText(input_debug_image, text_under_finger['text'], transformed_text_position, 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
         return input_debug_image, source_debug_image
     
     def __get_homography(self, input_image, source_image):
@@ -397,25 +422,28 @@ class VisionInstance:
 
         return H
     
-    def __get_text_info(self, input_image):
-        # Input is expected to be a file-like object with 'mimetype' and 'buffer' attributes
-        # Uncomment and implement the following code to use Azure Computer Vision API
-        # try:
-        #     result = self.computer_vision_client.read_in_stream(input_image.buffer, language='en')
-        #     operation = result.operation_location.split('/')[-1]
-        #
-        #     while True:
-        #         result = self.computer_vision_client.get_read_result(operation)
-        #         if result.status == "succeeded":
-        #             break
-        #         time.sleep(1)
-        #
-        #     return result.analyze_result
-        # except Exception as error:
-        #     print(f"Error analyzing image: {error}")
-        #     return None
+    def __get_text_info(self, input_image_path):
+        try: 
+            with open(input_image_path, 'rb') as image_stream:
+                result = self.computer_vision_client.read_in_stream(image_stream, language='en', raw=True)
+                
+                operation_location = result.headers["Operation-Location"]
+                operation_id = operation_location.split("/")[-1]
 
-        return self.test_data
+        
+            while True:
+                read_result = self.computer_vision_client.get_read_result(operation_id)
+                
+                if read_result.status not in ['notStarted', 'running']:
+                    break
+                time.sleep(1)
+        
+            return read_result.analyze_result.read_results
+        except Exception as error:
+            print(f"Error analyzing image: {error}")
+            return None
+
+        # return self.test_data
         
     def get_text_under_finger(self, finger_position=None):
         """
@@ -441,40 +469,38 @@ class VisionInstance:
         x, y = finger_position['x'], finger_position['y']
         
         # Get image dimensions
-        if 'readResults' in self.text_info and len(self.text_info['readResults']) > 0:
-            original_width = self.text_info['readResults'][0]['width']
-            original_height = self.text_info['readResults'][0]['height']
+        if len(self.text_info) > 0:
+            original_width = self.text_info[0].width
+            original_height = self.text_info[0].height
             
             # Current image dimensions
             source_height, source_width = self.source_image.shape[:2]
             
             # Check each text element to see if finger is inside its bounding box
-            for read_result in self.text_info['readResults']:
-                if 'lines' in read_result:
-                    for line in read_result['lines']:
-                        if 'boundingBox' in line:
-                            # Extract bounding box points
-                            bbox = line['boundingBox']
-                            
-                            # Convert bounding box format from [x1,y1,x2,y2,x3,y3,x4,y4] to points
-                            original_points = np.array([
-                                [bbox[0] / original_width, bbox[1] / original_height],
-                                [bbox[2] / original_width, bbox[3] / original_height],
-                                [bbox[4] / original_width, bbox[5] / original_height],
-                                [bbox[6] / original_width, bbox[7] / original_height]
-                            ], dtype=np.float32)
-                            
-                            # Scale points to current image dimensions
-                            points = (original_points * np.array([source_width, source_height])).astype(np.int32)
-                            
-                            # Check if point is inside polygon
-                            if cv2.pointPolygonTest(points, (x, y), False) >= 0:
-                                # Point is inside the polygon
-                                return {
-                                    'text': line['text'],
-                                    'confidence': line.get('confidence', 0.0),
-                                    'boundingBox': points.tolist()
-                                }
+            for read_result in self.text_info:
+                for line in read_result.lines:
+                    # Extract bounding box points
+                    bbox = line.bounding_box
+                    
+                    # Convert bounding box format from [x1,y1,x2,y2,x3,y3,x4,y4] to points
+                    original_points = np.array([
+                        [bbox[0] / original_width, bbox[1] / original_height],
+                        [bbox[2] / original_width, bbox[3] / original_height],
+                        [bbox[4] / original_width, bbox[5] / original_height],
+                        [bbox[6] / original_width, bbox[7] / original_height]
+                    ], dtype=np.float32)
+                    
+                    # Scale points to current image dimensions
+                    points = (original_points * np.array([source_width, source_height])).astype(np.int32)
+                    
+                    # Check if point is inside polygon
+                    if cv2.pointPolygonTest(points, (x, y), False) >= 0:
+                        # Point is inside the polygon
+                        return {
+                            'text': line.text,
+                            'confidence': getattr(line, 'confidence', 0.0),
+                            'boundingBox': points.tolist()
+                        }
         
         # No text found under finger
         return None

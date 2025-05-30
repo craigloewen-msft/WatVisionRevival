@@ -6,7 +6,7 @@ function DebugCamera() {
     const videoCanvas = useRef(null);
     const debugInputImageRef = useRef(null);
     const debugReferenceImageRef = useRef(null);
-    
+
     // Use useMemo to prevent recreation of WatVision instance on each render
     const watVision = useMemo(() => new WatVision(), []);
 
@@ -24,8 +24,12 @@ function DebugCamera() {
                 if (!navigator.mediaDevices) {
                     throw new Error("Media Devices API not supported in this browser or requires HTTPS/localhost context");
                 }
-                
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: "environment",
+                    }
+                });
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
                 }
@@ -59,14 +63,14 @@ function DebugCamera() {
 
         const videoEl = videoRef.current;
         const videoCanvasEl = videoCanvas.current;
-        
+
         try {
             // Draw the current video frame to canvas
             videoCanvasEl.width = videoEl.videoWidth;
             videoCanvasEl.height = videoEl.videoHeight;
             const ctx = videoCanvasEl.getContext("2d");
             ctx.drawImage(videoEl, 0, 0, videoEl.videoWidth, videoEl.videoHeight);
-            
+
             // Capture this frame as the source image
             await watVision.captureSourceImage(videoCanvasEl);
             setIsSourceCaptured(true);
@@ -93,7 +97,7 @@ function DebugCamera() {
         if (!videoEl || !videoCanvasEl) return;
 
         let animationFrameId;
-        
+
         const processFrame = async () => {
             // Skip if we're already processing a frame or video has ended
             if (processingRef.current || videoEl.ended || videoEl.paused) {
@@ -102,21 +106,21 @@ function DebugCamera() {
             }
 
             processingRef.current = true;
-            
+
             try {
                 // Draw the current video frame to canvas
                 videoCanvasEl.width = videoEl.videoWidth;
                 videoCanvasEl.height = videoEl.videoHeight;
                 const ctx = videoCanvasEl.getContext("2d", { willReadFrequently: true });
                 ctx.drawImage(videoEl, 0, 0, videoEl.videoWidth, videoEl.videoHeight);
-                
+
                 // Process this frame with WatVision
                 await watVision.step(
                     videoCanvasEl,
                     debugInputImageRef.current,
                     debugReferenceImageRef.current
                 );
-                
+
                 setLoading(false);
             } catch (err) {
                 console.error("Error processing frame:", err);
@@ -126,10 +130,10 @@ function DebugCamera() {
                 animationFrameId = requestAnimationFrame(processFrame);
             }
         };
-        
+
         // Start the frame processing loop
         animationFrameId = requestAnimationFrame(processFrame);
-        
+
         // Cleanup function
         return () => {
             cancelAnimationFrame(animationFrameId);
@@ -150,14 +154,14 @@ function DebugCamera() {
             </div>
             <div className="row mb-3">
                 <div className="col-12">
-                    <button 
-                        className="btn btn-primary mr-2" 
+                    <button
+                        className="btn btn-primary mr-2"
                         onClick={captureSource}
                         disabled={!watVision || !videoLoaded || isSourceCaptured}>
                         Capture Source Frame
                     </button>
-                    <button 
-                        className={`btn ${processingActive ? 'btn-danger' : 'btn-success'} ml-2`} 
+                    <button
+                        className={`btn ${processingActive ? 'btn-danger' : 'btn-success'} ml-2`}
                         onClick={toggleProcessing}
                         disabled={!isSourceCaptured}>
                         {processingActive ? 'Stop Processing' : 'Start Processing'}
