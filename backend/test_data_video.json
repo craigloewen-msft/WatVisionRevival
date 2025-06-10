@@ -11,7 +11,7 @@
             "unit": "pixel",
             "lines": [
                 {
-                    "boundingBox": [
+                    "bounding_box": [
                         579,
                         718,
                         669,
@@ -30,7 +30,7 @@
                     "text": "CAT",
                     "words": [
                         {
-                            "boundingBox": [
+                            "bounding_box": [
                                 578,
                                 718,
                                 662,
@@ -46,7 +46,7 @@
                     ]
                 },
                 {
-                    "boundingBox": [
+                    "bounding_box": [
                         222,
                         859,
                         321,
@@ -65,7 +65,7 @@
                     "text": "DOG",
                     "words": [
                         {
-                            "boundingBox": [
+                            "bounding_box": [
                                 221,
                                 859,
                                 308,
@@ -81,7 +81,7 @@
                     ]
                 },
                 {
-                    "boundingBox": [
+                    "bounding_box": [
                         639,
                         978,
                         802,
@@ -100,7 +100,7 @@
                     "text": "MOUSE",
                     "words": [
                         {
-                            "boundingBox": [
+                            "bounding_box": [
                                 641,
                                 979,
                                 792,
@@ -116,7 +116,7 @@
                     ]
                 },
                 {
-                    "boundingBox": [
+                    "bounding_box": [
                         303,
                         1059,
                         422,
@@ -135,7 +135,7 @@
                     "text": "FROG",
                     "words": [
                         {
-                            "boundingBox": [
+                            "bounding_box": [
                                 304,
                                 1060,
                                 407,
@@ -151,7 +151,7 @@
                     ]
                 },
                 {
-                    "boundingBox": [
+                    "bounding_box": [
                         1020,
                         1284,
                         1044,
@@ -170,7 +170,7 @@
                     "text": "A",
                     "words": [
                         {
-                            "boundingBox": [
+                            "bounding_box": [
                                 1025,
                                 1284,
                                 1032,
@@ -186,7 +186,7 @@
                     ]
                 },
                 {
-                    "boundingBox": [
+                    "bounding_box": [
                         378,
                         1298,
                         473,
@@ -205,7 +205,7 @@
                     "text": "SAMSUNG",
                     "words": [
                         {
-                            "boundingBox": [
+                            "bounding_box": [
                                 378,
                                 1298,
                                 470,
@@ -221,7 +221,7 @@
                     ]
                 },
                 {
-                    "boundingBox": [
+                    "bounding_box": [
                         818,
                         1810,
                         835,
@@ -240,7 +240,7 @@
                     "text": ". .",
                     "words": [
                         {
-                            "boundingBox": [
+                            "bounding_box": [
                                 818,
                                 1810,
                                 823,
@@ -254,7 +254,7 @@
                             "confidence": 0.656
                         },
                         {
-                            "boundingBox": [
+                            "bounding_box": [
                                 830,
                                 1810,
                                 834,
@@ -270,7 +270,7 @@
                     ]
                 },
                 {
-                    "boundingBox": [
+                    "bounding_box": [
                         768,
                         1827,
                         768,
@@ -289,7 +289,7 @@
                     "text": "-",
                     "words": [
                         {
-                            "boundingBox": [
+                            "bounding_box": [
                                 768,
                                 1829,
                                 768,

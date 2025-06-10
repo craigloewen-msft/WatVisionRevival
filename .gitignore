@@ -11,3 +11,7 @@ nohup.out
 **/__pycache__/
 
 *.jpg
+
+*.crt
+
+*.key

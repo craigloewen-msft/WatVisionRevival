@@ -9,3 +9,11 @@ matplotlib
 mediapipe
 dotenv
 kornia
+openai
+azure-cognitiveservices-speech 
+flask-socketio
+python-socketio
+eventlet
+azure-identity
+aiohttp
+openai[realtime]

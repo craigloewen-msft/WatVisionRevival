@@ -1,10 +1,15 @@
 from flask import Flask, request, jsonify, send_from_directory
 from vision_manager import VisionManager  # Assuming VisionManager is implemented in Python
+from flask_socketio import SocketIO, emit, join_room, leave_room
 import os
 from dotenv import load_dotenv
 
 import numpy as np
 import os
+
+import traceback
+
+from functools import wraps
 
 load_dotenv()
 
@@ -26,81 +31,149 @@ if os.path.exists(cert_path) and os.path.exists(key_path):
 else:
     print("SSL certificates not found, running without HTTPS")
 
+def socketio_error_handler(func):
+    """Decorator to handle exceptions in SocketIO event handlers"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        session_id = request.sid
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            print(f'Error in {func.__name__} for session {session_id}: {e}')
+            print('===ERROR ON REQUEST===')
+            print(f'Error: {str(e)}')
+            print(f'Traceback:\n{traceback.format_exc()}')
+            print('=======================')
+            emit('error', {'message': str(e)})
+    return wrapper
+
+def api_error_handler(func):
+    """Decorator to handle exceptions in API route handlers"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            print(f'Error in {func.__name__}: {e}')
+            print('===ERROR ON REQUEST===')
+            print(f'Error: {str(e)}')
+            print(f'Traceback:\n{traceback.format_exc()}')
+            print('=======================')
+            return jsonify(success=False, error=str(e))
+    return wrapper
+
 def create_app():
     app = Flask(__name__)
     app.config['UPLOAD_FOLDER'] = '/tmp'  # Temporary folder for file uploads
     
+    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+
     global vision_manager
-    vision_manager = VisionManager(app)
+    vision_manager = VisionManager(socketio)
     
     # Serve static files
     @app.route('/dist/<path:path>')
     def serve_static(path):
         return send_from_directory(os.path.join(os.getcwd(), 'dist'), path)
-    
-    # Helper function for try-catch
-    def try_catch_result(func):
-        try:
-            result = func()
-            return jsonify(success=True, data=result)
-        except Exception as e:
-            print('Error:', e)
-            return jsonify(success=False, error=str(e))
-    
-    # API endpoint for vision processing
-    @app.route('/api/get_text_info/', methods=['POST'])
-    def get_text_info():
-        if 'image' not in request.files:
-            return jsonify(success=False, error="No file part")
-        
-        file = request.files['image']
-        if file.filename == '':
-            return jsonify(success=False, error="No selected file")
-        
-        return try_catch_result(lambda: vision_manager.get_text_info(file))
-    
-    @app.route('/api/get_homography/', methods=['POST'])
-    def get_homography():
-        if 'input' not in request.files or 'source' not in request.files:
-            return jsonify(success=False, error="All files are not found")
-        
-        input_file = request.files['input']
-        source_file = request.files['source']
-        if input_file.filename == '' or source_file.filename == '':
-            return jsonify(success=False, error="No selected files")
-        
-        # Save files to temporary location
-        input_path = os.path.join(app.config['UPLOAD_FOLDER'], input_file.filename)
-        source_path = os.path.join(app.config['UPLOAD_FOLDER'], source_file.filename)
-        input_file.save(input_path)
-        source_file.save(source_path)
-        return try_catch_result(lambda: vision_manager.get_homography(input_path, source_path))
-    
-    @app.route('/api/set_source_image/', methods=['POST'])
-    def set_source_image():
-        if 'source' not in request.files:
-            return jsonify(success=False, error="No file part")
-        
-        return try_catch_result(lambda: vision_manager.set_source_image(request.files['source']))
-    
-    @app.route('/api/step/', methods=['POST'])
-    def step():
-        if 'image' not in request.files:
-            return jsonify(success=False, error="No file part")
-        
-        return try_catch_result(lambda: vision_manager.step(request.files['image']))
-    
+
     @app.route('/api/')
     def api():
         return jsonify(success=True, message="API is working!")
     
-    return app
+    @app.route('/api/set_source_image/', methods=['POST'])
+    @api_error_handler
+    def set_source_image():
+        if 'source' not in request.files:
+            return jsonify(success=False, error="No file part")
+        
+        # Check if the session ID is provided
+        session_id = request.form.get('session_id')
+        if not session_id:
+            return jsonify(success=False, error="Session ID is required")
+        
+        result = vision_manager.set_source_image(session_id, request.files['source'])
+        return jsonify(success=True, data=result)
+    
+    @app.route('/api/step/', methods=['POST'])
+    @api_error_handler
+    def step():
+        if 'image' not in request.files:
+            return jsonify(success=False, error="No file part")
+        
+        # Check if the session ID is provided
+        session_id = request.form.get('session_id')
+        if not session_id:
+            return jsonify(success=False, error="Session ID is required")
+        
+        result = vision_manager.step(session_id, request.files['image'])
+        return jsonify(success=True, data=result)
+    
+    @app.route('/api/explain_screen/', methods=['POST'])
+    @api_error_handler
+    def explain_screen():
+        # Check if the session ID is provided
+        session_id = request.form.get('session_id')
+        if not session_id:
+            return jsonify(success=False, error="Session ID is required")
+
+        result = vision_manager.get_current_image_description(session_id)
+        return jsonify(success=True, data=result)
+    
+    # WebSocket event handlers
+    @socketio.on('connect')
+    @socketio_error_handler
+    def handle_connect(auth=None):
+        print(f'Client connected: {request.sid}')
+        join_room(request.sid)
+        vision_manager.add_connection(request.sid)
+        emit('connected', {'session_id': request.sid})
+    
+    @socketio.on('disconnect')
+    @socketio_error_handler
+    def handle_disconnect(auth=None):
+        print(f'Client disconnected: {request.sid}')
+        vision_manager.stop_recognition(request.sid)
+        vision_manager.remove_connection(request.sid)
+    
+    @socketio.on('start_recognition')
+    @socketio_error_handler
+    def handle_start_recognition():
+        """Start continuous speech recognition"""
+        session_id = request.sid
+        print(f'Starting recognition for session {session_id}')
+        vision_manager.start_recognition(session_id)
+    
+    @socketio.on('stop_recognition')
+    @socketio_error_handler
+    def handle_stop_recognition():
+        """Stop continuous speech recognition"""
+        session_id = request.sid
+        print(f'Stopping recognition for session {session_id}')
+        vision_manager.stop_recognition(session_id)
+    
+    @socketio.on('audio_chunk')
+    @socketio_error_handler
+    def handle_audio_chunk(data):
+        """Handle incoming audio chunks"""
+        session_id = request.sid
+        print(f'Received audio chunk from {session_id}')
+
+        # Convert base64 to bytes if needed
+        if isinstance(data, str):
+            import base64
+            audio_data = base64.b64decode(data)
+        else:
+            audio_data = data
+        
+        vision_manager.process_audio_chunk(session_id, audio_data)
+    
+    return app, socketio
 
 # Create the app instance
-app = create_app()
+app, socketio = create_app()
 
 if __name__ == '__main__':
     if ssl_context:
-        app.run(host='0.0.0.0', port=host_port, ssl_context=ssl_context)
+        socketio.run(app, host='0.0.0.0', port=host_port, ssl_context=ssl_context)
     else:
-        app.run(host='0.0.0.0', port=host_port)
+        socketio.run(app, host='0.0.0.0', port=host_port)

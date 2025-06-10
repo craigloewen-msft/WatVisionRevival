@@ -1,5 +1,5 @@
-import cv from "@techstark/opencv-js";
 import axios from "axios";
+import SpeechStreamingClient from "./speechStreaming";
 
 class WatVision {
 
@@ -8,6 +8,7 @@ class WatVision {
         this.textToSpeech = window.speechSynthesis;
         this.lastReadText = null;
         this.isReading = false;
+        this.speechClient = new SpeechStreamingClient();
     }
 
     async captureSourceImage(inputImageElement) {
@@ -15,6 +16,7 @@ class WatVision {
 
         const formData = new FormData();
         formData.append("source", imgBlob, "image.png");
+        formData.append("session_id", this.getSessionId());
 
         const response = await axios.post("/api/set_source_image/", formData, {
             headers: {
@@ -34,6 +36,7 @@ class WatVision {
 
         const formData = new FormData();
         formData.append("image", imgBlob, "image.png");
+        formData.append("session_id", this.getSessionId());
 
         const response = await axios.post("/api/step/", formData, {
             headers: {
@@ -48,7 +51,7 @@ class WatVision {
 
             debugInputImageElement.src = `data:image/png;base64,${inputImageData}`;
             debugReferenceImageElement.src = `data:image/png;base64,${sourceImageData}`;
-            
+
             // Automatically read out text under finger if it exists and is different from last read text
             if (textUnderFinger && textUnderFinger.text && textUnderFinger.text !== this.lastReadText) {
                 this.readTextAloud(textUnderFinger.text);
@@ -65,33 +68,33 @@ class WatVision {
     // Method to convert text to speech
     readTextAloud(text) {
         if (!this.textToSpeech || this.isReading) return;
-        
+
         this.isReading = true;
-        
+
         // Cancel any ongoing speech
         this.textToSpeech.cancel();
-        
+
         // Create a new speech synthesis utterance
         const utterance = new SpeechSynthesisUtterance(text);
-        
+
         // Configure voice settings (optional)
         utterance.rate = 1.0; // Speed: 0.1 to 10
         utterance.pitch = 1.0; // Pitch: 0 to 2
         utterance.volume = 1.0; // Volume: 0 to 1
-        
+
         // Handle events
         utterance.onend = () => {
             this.isReading = false;
         };
-        
+
         utterance.onerror = (event) => {
             console.error("Speech synthesis error:", event);
             this.isReading = false;
         };
-        
+
         // Speak the text
         this.textToSpeech.speak(utterance);
-        
+
         console.log("Reading text:", text);
     }
 
@@ -122,6 +125,28 @@ class WatVision {
         }
 
         return imgBlob;
+    }
+
+    async explainScreen() {
+        // Query the server for the explanation of the current screen
+        const response = await axios.post("/api/explain_screen/", {
+            session_id: this.speechClient.sessionId,
+        });
+        if (response.data.success) {
+            console.log(response.data);
+            const explanation = response.data;
+            if (explanation) {
+                this.readTextAloud(explanation.data);
+            } else {
+                console.warn("No explanation available for the current screen.");
+            }
+        } else {
+            console.error("Failed to get explanation:", response.data.error);
+        }
+    }
+
+    getSessionId() {
+        return this.speechClient.sessionId;
     }
 }
 

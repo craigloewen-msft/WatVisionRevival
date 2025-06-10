@@ -1,7 +1,7 @@
 import time
 import cv2
+from flask_socketio import SocketIO
 import numpy as np
-import torch
 import tqdm
 import json
 import os
@@ -15,43 +15,65 @@ from mediapipe.tasks.python import vision
 
 from azure.cognitiveservices.vision.computervision import ComputerVisionClient
 
+from types import SimpleNamespace
+
+from openai import AzureOpenAI
+
+import base64
+from mimetypes import guess_type
+
+import azure.cognitiveservices.speech as speechsdk
+
+from speech_service import ContinuousSpeechService
+
+from matching_service import MatchingService
+
+import asyncio
+
 HAND_CONNECTIONS = mp.solutions.hands.HAND_CONNECTIONS
 
-def warp_corners_and_draw_matches(ref_points, dst_points, img1, img2):
-    # Calculate the Homography matrix
-    H, mask = cv2.findHomography(ref_points, dst_points, cv2.USAC_MAGSAC, 3.5, maxIters=1_000, confidence=0.999)
-    mask = mask.flatten()
+# Function to encode a local image into data URL 
+def local_image_to_data_url(image_path):
+    # Guess the MIME type of the image based on the file extension
+    mime_type, _ = guess_type(image_path)
+    if mime_type is None:
+        mime_type = 'application/octet-stream'  # Default MIME type if none is found
 
-    print('inlier ratio: ', np.sum(mask)/len(mask))
+    # Read and encode the image file
+    with open(image_path, "rb") as image_file:
+        base64_encoded_data = base64.b64encode(image_file.read()).decode('utf-8')
 
-    # Get corners of the first image (image1)
-    h, w = img1.shape[:2]
-    corners_img1 = np.array([[0, 0], [w-1, 0], [w-1, h-1], [0, h-1]], dtype=np.float32).reshape(-1, 1, 2)
+    # Construct the data URL
+    return f"data:{mime_type};base64,{base64_encoded_data}"
 
-    # Warp corners to the second image (image2) space
-    warped_corners = cv2.perspectiveTransform(corners_img1, H)
-
-    # Draw the warped corners in image2
-    img2_with_corners = img2.copy()
-    for i in range(len(warped_corners)):
-        start_point = tuple(warped_corners[i-1][0].astype(int))
-        end_point = tuple(warped_corners[i][0].astype(int))
-        cv2.line(img2_with_corners, start_point, end_point, (255, 0, 0), 4)  # Using solid green for corners
-
-    # Prepare keypoints and matches for drawMatches function
-    keypoints1 = [cv2.KeyPoint(p[0], p[1], 5) for p in ref_points]
-    keypoints2 = [cv2.KeyPoint(p[0], p[1], 5) for p in dst_points]
-    matches = [cv2.DMatch(i,i,0) for i in range(len(mask)) if mask[i]]
-
-    # Draw inlier matches
-    img_matches = cv2.drawMatches(img1, keypoints1, img2_with_corners, keypoints2, matches, None,
-                                  matchColor=(0, 255, 0), flags=2)
-
-    return (img_matches, H)
+def np_array_image_to_data_url(np_array_image):
+    """
+    Convert a NumPy array image to a data URL.
+    
+    Args:
+        np_array_image (np.ndarray): The image in NumPy array format.
+        
+    Returns:
+        str: The data URL of the image.
+    """
+    # Convert the NumPy array to bytes
+    _, buffer = cv2.imencode('.png', np_array_image)
+    base64_encoded_data = base64.b64encode(buffer).decode('utf-8')
+    
+    # Construct the data URL
+    return f"data:image/png;base64,{base64_encoded_data}"
 
 class VisionInstance:
 
-    def __init__(self, hands_detector, computer_vision_client: ComputerVisionClient):
+    def __init__(
+        self, 
+        hands_detector, 
+        computer_vision_client: ComputerVisionClient, 
+        llm_client: AzureOpenAI, 
+        matching_service: MatchingService,
+        session_id: str,
+        socketio: SocketIO
+    ):
         self.source_image = None
         self.input_image = None
 
@@ -60,15 +82,22 @@ class VisionInstance:
 
         self.text_info = None
 
+        self.llm_client = llm_client
+        self.deployment_name = os.getenv('AZURE_LLM_DEPLOYMENT')
+
         self.hands_detector = hands_detector
 
         self.computer_vision_client = computer_vision_client
 
-        self.xfeat = torch.hub.load('verlab/accelerated_features', 'XFeat', pretrained = True, top_k = 4096)
+        self.speech_service = ContinuousSpeechService(socketio, session_id)
+
+        self.matching_service = matching_service
+
+        self.session_id = session_id
 
         data_path = os.path.join(os.path.dirname(__file__), 'test_data_video.json')
         with open(data_path, 'r') as file:
-            self.test_data = json.load(file)
+            self.test_data = json.load(file, object_hook=lambda d: SimpleNamespace(**d))
 
     def set_source_image(self, source_image: np.ndarray, image_path):
         self.source_image = source_image
@@ -389,61 +418,30 @@ class VisionInstance:
     
     def __get_homography_xfeat(self, input_image, source_image):
         # Resize images to smaller size for faster processing
-        resize_factor = 0.4  # Reduce to 40% of original size
-        input_image_resized = cv2.resize(input_image, None, fx=resize_factor, fy=resize_factor)
-        source_image_resized = cv2.resize(source_image, None, fx=resize_factor, fy=resize_factor)
-        
-        # Detect and compute on resized images with fewer features
-        top_k = 2048  # Reduce from 4096 to 2048 features
-        output0 = self.xfeat.detectAndCompute(source_image_resized, top_k=top_k)[0]
-        output1 = self.xfeat.detectAndCompute(input_image_resized, top_k=top_k)[0]
-
-        # Set the image size to the original dimensions
-        output0.update({'image_size': (source_image.shape[1], source_image.shape[0])})
-        output1.update({'image_size': (input_image.shape[1], input_image.shape[0])})
-        
-        # Match features
-        mkpts_0, mkpts_1, other = self.xfeat.match_lighterglue(output0, output1)
-        
-        # Scale keypoints back to original image size
-        mkpts_0 = mkpts_0 / resize_factor
-        mkpts_1 = mkpts_1 / resize_factor
-
-        # Calculate homography using USAC_FAST algorithm with fewer iterations
-        H, mask = cv2.findHomography(mkpts_0, mkpts_1, cv2.USAC_FAST, 3.0, maxIters=500, confidence=0.995)
-        
-        # Only generate visualization in debug mode or when needed
-        if os.environ.get('DEBUG_VISUALIZATION', '0') == '1':
-            # Calculate homography and create visualization
-            canvas, _ = warp_corners_and_draw_matches(mkpts_0, mkpts_1, source_image, input_image)
-            # Save the concatenated image with matches
-            concatenated_image_path = os.path.join(os.getcwd(), 'concatenated_image_with_matches.jpg')
-            cv2.imwrite(concatenated_image_path, canvas)
-
-        return H
+        return self.matching_service.get_homography_xfeat(input_image, source_image)
     
     def __get_text_info(self, input_image_path):
-        try: 
-            with open(input_image_path, 'rb') as image_stream:
-                result = self.computer_vision_client.read_in_stream(image_stream, language='en', raw=True)
+        # try: 
+        #     with open(input_image_path, 'rb') as image_stream:
+        #         result = self.computer_vision_client.read_in_stream(image_stream, language='en', raw=True)
                 
-                operation_location = result.headers["Operation-Location"]
-                operation_id = operation_location.split("/")[-1]
+        #         operation_location = result.headers["Operation-Location"]
+        #         operation_id = operation_location.split("/")[-1]
 
         
-            while True:
-                read_result = self.computer_vision_client.get_read_result(operation_id)
+        #     while True:
+        #         read_result = self.computer_vision_client.get_read_result(operation_id)
                 
-                if read_result.status not in ['notStarted', 'running']:
-                    break
-                time.sleep(1)
+        #         if read_result.status not in ['notStarted', 'running']:
+        #             break
+        #         time.sleep(1)
         
-            return read_result.analyze_result.read_results
-        except Exception as error:
-            print(f"Error analyzing image: {error}")
-            return None
+        #     return read_result.analyze_result.read_results
+        # except Exception as error:
+        #     print(f"Error analyzing image: {error}")
+        #     return None
 
-        # return self.test_data
+        return self.test_data.readResults
         
     def get_text_under_finger(self, finger_position=None):
         """
@@ -504,3 +502,45 @@ class VisionInstance:
         
         # No text found under finger
         return None
+    
+    def get_current_image_description(self):
+        response = self.llm_client.chat.completions.create(
+            model=self.deployment_name,
+            messages=[
+                { "role": "system", "content": """You are a helpful AI assistant which helps explain an image to a blind or visually impaired person.
+You will keep your answers short and sweet. You will be shown an image of a touch screen and describe that touch screen. Focus on describing what it says and the locations of where things are on the touch screen.""" },
+                { "role": "user", "content": [  
+                    { 
+                        "type": "text", 
+                        "text": "Describe this picture:" 
+                    },
+                    { 
+                        "type": "image_url",
+                        "image_url": {
+                            "url": np_array_image_to_data_url(self.input_image)
+                        }
+                    }
+                ] } 
+            ],
+            max_tokens=2000 
+        )
+        
+        return response.choices[0].message.content.strip()
+    
+    def start_recognition(self):
+        """
+        Starts the speech recognition service.
+        """
+        return asyncio.run(self.speech_service.start_recognition())
+
+    def stop_recognition(self):
+        """
+        Stops the speech recognition service.
+        """
+        return asyncio.run(self.speech_service.stop_recognition())
+
+    def process_audio_chunk(self, audio_chunk):
+        """
+        Processes an audio chunk for speech recognition.
+        """
+        return asyncio.run(self.speech_service.process_audio_chunk(audio_chunk))
