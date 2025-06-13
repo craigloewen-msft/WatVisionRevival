@@ -89,7 +89,7 @@ class VisionInstance:
 
         self.computer_vision_client = computer_vision_client
 
-        self.speech_service = ContinuousSpeechService(socketio, session_id)
+        self.speech_service = ContinuousSpeechService(socketio, session_id, self)
 
         self.matching_service = matching_service
 
@@ -527,17 +527,17 @@ You will keep your answers short and sweet. You will be shown an image of a touc
         
         return response.choices[0].message.content.strip()
     
-    def start_recognition(self):
+    def start_session(self):
         """
         Starts the speech recognition service.
         """
-        return asyncio.run(self.speech_service.start_recognition())
+        return asyncio.run(self.speech_service.start_session())
 
-    def stop_recognition(self):
+    def stop_session(self):
         """
         Stops the speech recognition service.
         """
-        return asyncio.run(self.speech_service.stop_recognition())
+        return asyncio.run(self.speech_service.stop_session())
 
     def process_audio_chunk(self, audio_chunk):
         """

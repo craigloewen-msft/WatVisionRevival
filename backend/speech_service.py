@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 from dotenv import load_dotenv
 import wave
@@ -10,16 +11,22 @@ import aiohttp
 import websockets
 import json
 from websockets import ClientConnection
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from vision_instance import VisionInstance
 
 class ContinuousSpeechService:
-    def __init__(self, socketio, session_id: str):
+    def __init__(self, socketio, session_id: str, parent_vision_instance: "VisionInstance"):
         self.socketio = socketio
         self.session_info = None
 
         self.session_id = session_id
 
         self.debug_audio_file = None
-        self.debug_recording = True  # Set to False to disable recording
+        self.debug_recording = False  # Set to False to disable recording
+
+        self.parent_vision_instance = parent_vision_instance
 
         realtime_endpoint = os.getenv('AZURE_REALTIME_OPENAI_ENDPOINT')
         realtime_key = os.getenv('AZURE_REALTIME_OPENAI_KEY')
@@ -33,8 +40,10 @@ class ContinuousSpeechService:
         self.websocket: ClientConnection = None
         self.is_running = False
         self._event_task = None
+
+        self.tokenUsageCount = 0
     
-    async def start_recognition(self):
+    async def start_session(self):
         """Start continuous recognition for a session"""
 
         self.is_running = True
@@ -54,7 +63,7 @@ class ContinuousSpeechService:
         await self._event_task
         return True
     
-    async def stop_recognition(self):
+    async def stop_session(self):
         """Stop recognition and clean up"""
         self.is_running = False
 
@@ -76,9 +85,9 @@ class ContinuousSpeechService:
         #     self.debug_audio_file.close()
         #     print("Debug: Audio file saved and closed")
 
-        self.socketio.emit('session_stopped', {
-            'session_id': self.session_id,
-        }, room=self.session_id)
+        print(f"Session {self.session_id} ending. Total tokens used: {self.tokenUsageCount}")
+
+        self.socketio.emit('session_stopped', {}, room=self.session_id)
 
         if self.websocket:
             self.websocket = None
@@ -94,8 +103,47 @@ class ContinuousSpeechService:
             session_config = {
                 "type": "session.update",
                 "session": {
+                    "tools": [
+                        {
+                            "type": "function",
+                            "name": "get_description_of_touchscreen",
+                            "description": "Get information about the touch screen in front of the user.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {},
+                                "required": []
+                            }
+                        },
+                        {
+                            "type": "function",
+                            "name": "start_tracking_touchscreen",
+                            "description": "Start touch screen processing. The user's hand must be away from the screen when started.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {},
+                                "required": []
+                            }
+                        },
+                        {
+                            "type": "function",
+                            "name": "stop_tracking_touchscreen",
+                            "description": "Stop identifying the touch screen.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {},
+                                "required": []
+                            }
+                        },
+                    ],
                     "modalities": ["text", "audio"],
-                    # "instructions": "You are a helpful assistant. Please analyze and respond to the audio input.",
+                    "instructions": """You are a helpful assistant whose goal is to help the user understand the touch screen infront of them.
+The user is blind or visually impaired.
+
+You have some functions available to you, use them as needed to help the user.
+When you are 'tracking the touch screen', the system will take a snapshot of the touch screen and then as the user moves their hand over the screen you will get events of what their hand is hovering over.
+
+When starting say hello and ask the user to to tell you when they are ready to start tracking the touch screen.""",
+                    "tool_choice": "auto",
                     # "voice": "alloy",
                     # "input_audio_format": "pcm16",
                     # "output_audio_format": "pcm16"
@@ -111,7 +159,7 @@ class ContinuousSpeechService:
                     "content": [
                         {
                             "type": "input_text",
-                            "text": "Hey there!",
+                            "text": "Hey there! Can you help me understand this touch screen in front of me?",
                         }
                     ]
                 }
@@ -127,41 +175,86 @@ class ContinuousSpeechService:
             }
             await websocket.send(json.dumps(response_request))
 
-            self.socketio.emit('session_started', {
-                'session_id': self.session_id,
-            }, room=self.session_id)
+            self.socketio.emit('session_started', {}, room=self.session_id)
 
             async for message in websocket:
                 event = json.loads(message)
                 event_type = event.get("type", "")
-                print("Debug: Received event:", event_type)
                 if not self.is_running:
                     break
+
+                print(f"Debug: Received event of type {event_type}")
                     
                 if event_type == "response.audio_transcript.delta":
-                    self.socketio.emit('response.audio_transcript.delta', {
-                        'session_id': self.session_id,
-                        'delta': event.get('delta', ''),
-                    }, room=self.session_id)
+                    self.socketio.emit('response.audio_transcript.delta', event, room=self.session_id)
                 elif event_type == "response.audio.delta":
-                    self.socketio.emit('response.audio.delta', {
-                        'session_id': self.session_id,
-                        'delta': event.get('delta', ''),
-                    }, room=self.session_id)
+                    self.socketio.emit('response.audio.delta', event, room=self.session_id)
+                elif event_type == "response.done":
+                    usage = event.get('response', {}).get('usage', {})
+
+                    if usage: 
+                        self.tokenUsageCount += usage.get('total_tokens', 0)
+                        print(f"Debug: Total tokens used: {self.tokenUsageCount}")
+
+                    function_calls = event.get('response', {}).get('output', [])
+
+                    for call in function_calls:
+                        if call.get('type') == 'function_call':
+                            await self.__process_function_call(call)
+
+                    self.socketio.emit('response.done', event, room=self.session_id)
                 elif event_type == "error":
                     print("===RECEIVED ERROR from OpenAI realtime service===")
                     print(event)
-                    await self.stop_recognition()
-                else:
-                    print(f"Unhandled event type: {event_type}")
-                    self.socketio.emit(event_type, {
-                        'event_data': 1,
-                    }, room=self.session_id)
+                    self.socketio.emit('error', event, room=self.session_id)
+                    await self.stop_session()
+                # else:
+                #     self.socketio.emit(event_type, {}, room=self.session_id)
 
         print("Debug: Event processing loop ended")
 
         if self.websocket:
             self.websocket = None
+    
+    async def __process_function_call(self, function_call):
+        """Process a function call from the response"""
+        function_name = function_call.get('name')
+        function_args = function_call.get('arguments', {})
+
+        print(f"Debug: Processing function call: {function_name} with args: {function_args}")
+
+        function_output = ""
+        
+        if function_name == "start_tracking_touchscreen":
+            self.socketio.emit('start_tracking_touchscreen', {}, room=self.session_id)
+            function_output = "Success"
+        elif function_name == "stop_tracking_touchscreen":
+            self.socketio.emit('stop_tracking_touchscreen', {}, room=self.session_id)
+            function_output = "Success"
+        elif function_name == "get_description_of_touchscreen":
+            function_output = self.parent_vision_instance.get_current_image_description()
+
+        if function_output != "":
+            function_response = {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "function_call_output",
+                    "call_id": function_call.get('call_id'),
+                    "output": "{\"result\": \"" + function_output + "\"}"
+                }
+            }
+            await self.websocket.send(json.dumps(function_response))
+
+            response_request = {
+                "type": "response.create",
+                "response": {
+                    "modalities": ["text", "audio"]
+                }
+            }
+            await self.websocket.send(json.dumps(response_request))
+
+
+        
     
     async def process_audio_chunk(self, audio_data):
         """Process incoming audio chunk"""

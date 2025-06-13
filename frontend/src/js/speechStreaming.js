@@ -1,14 +1,15 @@
-import io from 'socket.io-client';
-
 class SpeechStreamingClient {
-    constructor() {
-        this.socket = null;
+    constructor(watvision_parent) {
         this.mediaRecorder = null;
         this.audioContext = null;
         this.processor = null;
         this.source = null;
         this.isRecording = false;
-        this.sessionId = null;
+        this.textToSpeech = window.speechSynthesis;
+
+        this.playbackSpeed = 2.0;
+
+        this.isReading = false;
 
         this.audioTranscriptText = "";
 
@@ -16,78 +17,17 @@ class SpeechStreamingClient {
         this.audioQueue = [];
         this.nextPlayTime = 0;
         this.playbackAudioContext = null;
-    }
 
-    connect() {
-        // Connect to the backend WebSocket
-        this.socket = io('ws://localhost:8080', {
-            transports: ['websocket']
-        });
-
-        // Set up event listeners
-        this.socket.on('connected', (data) => {
-            console.log('Connected with session ID:', data.session_id);
-            this.sessionId = data.session_id;
-            this.onConnected?.(data.session_id);
-        });
-
-        this.socket.on('disconnect', () => {
-            console.log('Disconnected from server');
-            this.onDisconnect?.();
-        });
-
-        this.socket.on('error', (error) => {
-            console.error('Socket error:', error);
-            this.onError?.(error);
-        });
-
-        this.socket.onAny((eventName, data) => {
-            console.log('Socket event received:', eventName, data);
-        });
-
-        // Custom events
-
-        this.socket.on('session_started', () => {
-            console.log('Recognition session started');
-            this.startRecording();
-            this.onSessionStarted?.();
-        });
-
-        this.socket.on('session_stopped', () => {
-            console.log('Recognition session stopped');
-            this.onSessionStopped?.();
-        });
-
-        this.socket.on('response.audio_transcript.delta', (data) => {
-            this.audioTranscriptText += data.delta;
-            this.onAudioTranscriptDelta?.(data.delta);
-        });
-
-        this.socket.on('response.audio.delta', (data) => {
-            this.playAudioDelta(data.delta);
-        });
-    }
-
-    disconnect() {
-        this.stopRecording();
-        if (this.socket) {
-            this.socket.disconnect();
-            this.socket = null;
-        }
-    }
-
-    async startSesssion() {
-        // Start recognition session
-        this.socket.emit('start_recognition');
-    }
-
-    async stopSession() {
-        // Stop recognition session
-        this.socket.emit('stop_recognition');
-        this.stopRecording();
+        this.watvision_parent = watvision_parent;
     }
 
     async startRecording() {
+        // Prevent multiple recording sessions
+        if (this.isRecording) {
+            console.log("Recording already in progress, skipping start recording");
+            return;
+        }
+
         try {
             // Get microphone access
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -124,7 +64,7 @@ class SpeechStreamingClient {
                 }
 
                 // Send audio chunk to backend
-                this.socket.emit('audio_chunk', pcmData.buffer);
+                this.watvision_parent.socket.emit('audio_chunk', pcmData.buffer);
             };
 
             // Connect audio nodes
@@ -141,7 +81,13 @@ class SpeechStreamingClient {
 
     stopRecording() {
         if (this.isRecording) {
+            console.log("Stopping recording...");
             this.isRecording = false;
+
+            // Stop media tracks first (before disconnecting source)
+            if (this.source && this.source.mediaStream) {
+                this.source.mediaStream.getTracks().forEach(track => track.stop());
+            }
 
             // Disconnect audio nodes
             if (this.processor) {
@@ -155,11 +101,6 @@ class SpeechStreamingClient {
             if (this.audioContext) {
                 this.audioContext.close();
                 this.audioContext = null;
-            }
-
-            // Stop media tracks
-            if (this.source && this.source.mediaStream) {
-                this.source.mediaStream.getTracks().forEach(track => track.stop());
             }
         }
     }
@@ -194,8 +135,9 @@ class SpeechStreamingClient {
                 channelData[i] = pcm16Data[i] / 32768.0; // Convert to float32 range [-1, 1]
             }
 
-            // Calculate duration of this audio chunk
-            const duration = audioBuffer.duration;
+            // Calculate duration of this audio chunk accounting for playback rate
+            const baseDuration = audioBuffer.duration;
+            const actualDuration = baseDuration / this.playbackSpeed;
 
             // Ensure nextPlayTime is not in the past
             const currentTime = this.playbackAudioContext.currentTime;
@@ -206,47 +148,49 @@ class SpeechStreamingClient {
             // Create and schedule the audio source
             const source = this.playbackAudioContext.createBufferSource();
             source.buffer = audioBuffer;
+            source.playbackRate.value = this.playbackSpeed
             source.connect(this.playbackAudioContext.destination);
 
             // Schedule playback at the next available time
             source.start(this.nextPlayTime);
 
-            // Update nextPlayTime for the next audio chunk
-            this.nextPlayTime += duration;
-
-            console.log(`Scheduled audio chunk: start=${this.nextPlayTime - duration}, duration=${duration}`);
+            // Update nextPlayTime for the next audio chunk using actual duration
+            this.nextPlayTime += actualDuration;
 
         } catch (error) {
             console.error('Error playing audio delta:', error);
         }
     }
 
-    // Callback events
+    // Method to convert text to speech
+    readTextAloud(text) {
+        if (!this.textToSpeech || this.isReading) return;
 
-    setOnConnected(callback) {
-        this.onConnected = callback;
-    }
+        this.isReading = true;
 
-    setOnDisconnect(callback) {
-        this.onDisconnect = callback;
-    }
+        // Cancel any ongoing speech
+        this.textToSpeech.cancel();
 
-    setOnError(callback) {
-        this.onError = callback;
-    }
+        // Create a new speech synthesis utterance
+        const utterance = new SpeechSynthesisUtterance(text);
 
-    // Custom events
+        // Configure voice settings (optional)
+        utterance.rate = 1.0; // Speed: 0.1 to 10
+        utterance.pitch = 1.0; // Pitch: 0 to 2
+        utterance.volume = 1.0; // Volume: 0 to 1
 
-    setOnSessionStarted(callback) {
-        this.onSessionStarted = callback;
-    }
+        // Handle events
+        utterance.onend = () => {
+            this.isReading = false;
+        };
 
-    setOnSessionStopped(callback) {
-        this.onSessionStopped = callback;
-    }
+        utterance.onerror = (event) => {
+            console.error("Speech synthesis error:", event);
+            this.isReading = false;
+        };
 
-    setOnAudioTranscriptDelta(callback) {
-        this.onAudioTranscriptDelta = callback;
+        // Speak the text
+        this.textToSpeech.speak(utterance);
     }
 }
 

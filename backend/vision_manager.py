@@ -152,21 +152,22 @@ class VisionManager:
             raise ValueError(f"Session {session_id} not found")
         
         # Clean up the VisionInstance
+        self.visionInstanceList[session_id].stop_session()
         del self.visionInstanceList[session_id]
         
         return True
     
-    def start_recognition(self, session_id):
+    def start_session(self, session_id):
         if session_id not in self.visionInstanceList:
             raise ValueError(f"Session {session_id} not found")
             
-        return self.visionInstanceList[session_id].start_recognition()
+        return self.visionInstanceList[session_id].start_session()
     
-    def stop_recognition(self, session_id):
+    def stop_session(self, session_id):
         if session_id not in self.visionInstanceList:
             raise ValueError(f"Session {session_id} not found")
 
-        return self.visionInstanceList[session_id].stop_recognition()
+        return self.visionInstanceList[session_id].stop_session()
     
     def process_audio_chunk(self, session_id, audio_data):
         if session_id not in self.visionInstanceList:

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import WatVision from "../js/watvision";
 
 function DebugVideo() {
@@ -7,13 +7,12 @@ function DebugVideo() {
     const debugInputImageRef = useRef(null);
     const debugReferenceImageRef = useRef(null);
 
-    const watVision = useMemo(() => new WatVision(), []);
+    const [watVision, setWatVision] = useState(null);
 
     const [videoLoaded, setVideoLoaded] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [isSourceCaptured, setIsSourceCaptured] = useState(false);
-    const [processingActive, setProcessingActive] = useState(false);
+    const [trackingScreen, setTrackingScreen] = useState(false);
     const processingRef = useRef(false); // Use a ref to track processing state across renders
 
     // Speech recognition states
@@ -23,56 +22,78 @@ function DebugVideo() {
 
     const [sessionId, setSessionId] = useState(null);
 
-    // Initialize speech client
+    // Initialize WatVision after refs are available
     useEffect(() => {
-        // Set up event handlers
-        watVision.speechClient.setOnConnected((sessionId) => {
-            console.log("Connected to speech client with session ID:", sessionId);
-            setSessionId(sessionId);
-            setSpeechError(null);
-        });
+        if (videoCanvas.current && debugInputImageRef.current && debugReferenceImageRef.current) {
+            console.log("Creating WatVision instance...");
+            
+            const watVisionInstance = new WatVision(
+                videoCanvas.current,
+                debugInputImageRef.current,
+                debugReferenceImageRef.current
+            );
 
-        watVision.speechClient.setOnDisconnect(() => {
-            console.log("Disconnected from speech client");
-            setSessionId(null);
-            setIsRecording(false);
-            setSpeechError("Disconnected from speech client");
-        });
+            // Set up event handlers
+            watVisionInstance.setOnConnected((sessionId) => {
+                setSessionId(sessionId);
+                setSpeechError(null);
+            });
 
-        watVision.speechClient.setOnError((error) => {
-            console.error("Speech recognition error:", error);
-            setSpeechError(error.message || "Speech recognition error");
-            setIsRecording(false);
-        });
+            watVisionInstance.setOnDisconnect(() => {
+                console.log("Disconnected from speech client");
+                setSessionId(null);
+                setIsRecording(false);
+                setSpeechError("Disconnected from speech client");
+            });
 
-        watVision.speechClient.setOnSessionStarted(() => {
-            console.log("Speech recognition session started");
-            setSpeechError(null);
-        });
+            watVisionInstance.setOnError((error) => {
+                console.error("Speech recognition error:", error);
+                setSpeechError(error.message || "Speech recognition error");
+                setIsRecording(false);
+            });
 
-        watVision.speechClient.setOnSessionStopped(() => {
-            console.log("Speech recognition session stopped");
-            setSessionId(null);
-        });
+            watVisionInstance.setOnSessionStarted(() => {
+                console.log("Speech recognition session started");
+                setSpeechError(null);
+            });
 
-        watVision.speechClient.setOnAudioTranscriptDelta((delta) => {
-            setInterimText(watVision.speechClient.audioTranscriptText);
-        });
+            watVisionInstance.setOnSessionStopped(() => {
+                console.log("Speech recognition session stopped");
+                setSessionId(null);
+            });
 
-        // Connect to backend
-        watVision.speechClient.connect();
+            watVisionInstance.setOnAudioTranscriptDelta((delta) => {
+                setInterimText(watVisionInstance.audioTranscriptText);
+            });
 
-        // Cleanup on unmount
-        return () => {
-            watVision.speechClient.disconnect();
-        };
-    }, [watVision]);
+            watVisionInstance.externalTrackingScreen = setTrackingScreen;
+
+            watVisionInstance.connect();
+
+            setWatVision(watVisionInstance);
+
+            console.log("WatVision instance created with refs:", {
+                videoCanvas: videoCanvas.current,
+                debugInputImageRef: debugInputImageRef.current,
+                debugReferenceImageRef: debugReferenceImageRef.current
+            });
+
+            // Cleanup on unmount
+            return () => {
+                console.log("Cleaning up WatVision instance...");
+                watVisionInstance.disconnect();
+            };
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Empty dependency array means this runs once after initial render
 
     // Toggle speech recognition
     const toggleSpeechRecognition = async () => {
+        if (!watVision) return;
+
         if (!isRecording) {
             try {
-                await watVision.speechClient.startSesssion();
+                await watVision.startSession();
                 setIsRecording(true);
                 setSpeechError(null);
             } catch (err) {
@@ -80,7 +101,9 @@ function DebugVideo() {
                 setSpeechError("Failed to start recording");
             }
         } else {
-            watVision.speechClient.stopSession();
+            if (watVision) {
+                watVision.stopSession();
+            }
             setIsRecording(false);
         }
     };
@@ -101,36 +124,6 @@ function DebugVideo() {
         };
     }, []);
 
-    // Capture initial source image when "Capture Source" button is clicked
-    const captureSource = async () => {
-        if (!watVision || !videoLoaded) return;
-
-        const videoEl = videoRef.current;
-        const videoCanvasEl = videoCanvas.current;
-
-        try {
-            // Ensure video is loaded and ready
-            if (videoEl.readyState < 2) {
-                console.warn("Video not ready yet");
-                return;
-            }
-
-            // Draw the current video frame to canvas
-            videoCanvasEl.width = videoEl.videoWidth;
-            videoCanvasEl.height = videoEl.videoHeight;
-            const ctx = videoCanvasEl.getContext("2d");
-            ctx.drawImage(videoEl, 0, 0, videoEl.videoWidth, videoEl.videoHeight);
-
-            // Capture this frame as the source image
-            await watVision.captureSourceImage(videoCanvasEl);
-            setIsSourceCaptured(true);
-            console.log("Source image captured successfully");
-        } catch (err) {
-            console.error("Error capturing source image:", err);
-            setError(err);
-        }
-    };
-
     const explainScreen = async () => {
         if (!watVision) return;
 
@@ -138,13 +131,20 @@ function DebugVideo() {
     }
 
     // Toggle video processing on/off
-    const toggleProcessing = () => {
-        setProcessingActive(prev => !prev);
+    const toggleTrackingScreen = () => {
+        if (!watVision) return;
+
+        setTrackingScreen(prev => !prev);
+        if (!trackingScreen) {
+            watVision.startTrackingScreen();
+        } else {
+            watVision.stopTrackingScreen();
+        }
     };
 
     // Process video frames
     useEffect(() => {
-        if (!watVision || !videoLoaded || !isSourceCaptured || !processingActive) {
+        if (!watVision || !videoLoaded) {
             return;
         }
 
@@ -178,11 +178,7 @@ function DebugVideo() {
                 ctx.drawImage(videoEl, 0, 0, videoEl.videoWidth, videoEl.videoHeight);
 
                 // Process this frame with WatVision
-                await watVision.step(
-                    videoCanvasEl,
-                    debugInputImageRef.current,
-                    debugReferenceImageRef.current
-                );
+                await watVision.step();
 
                 setLoading(false);
             } catch (err) {
@@ -201,14 +197,25 @@ function DebugVideo() {
         return () => {
             cancelAnimationFrame(animationFrameId);
         };
-    }, [watVision, videoLoaded, isSourceCaptured, processingActive]);
+    }, [watVision, videoLoaded, trackingScreen]);
 
+    // Debug functions
+
+    const requestStartTrackingTouchScreen = () => {
+        if (!watVision) return;
+        console.log("Requesting start tracking touch screen...");
+        watVision.socket.emit('debug_request_start_tracking_touchscreen');
+    };
+
+    // Return the component JSX
     return (
         <div className="container">
             <h3>Video Debug Page</h3>
             <div className="row">
                 <div>
-                    {loading ? (
+                    {!watVision ? (
+                        <p>Initializing WatVision...</p>
+                    ) : loading ? (
                         <p>Loading...</p>
                     ) : error ? (
                         <p>Error: {error.message}</p>
@@ -223,7 +230,8 @@ function DebugVideo() {
                             <h5 className="card-title">Voice Control</h5>
                             <button
                                 className={`btn ${isRecording ? 'btn-danger' : 'btn-primary'} mb-2`}
-                                onClick={toggleSpeechRecognition}>
+                                onClick={toggleSpeechRecognition}
+                                disabled={!watVision}>
                                 <i className={`fas fa-microphone${isRecording ? '-slash' : ''}`}></i>
                                 {isRecording ? ' Stop Listening' : ' Start Listening'}
                             </button>
@@ -252,21 +260,26 @@ function DebugVideo() {
             <div className="row mb-3">
                 <div className="col-12">
                     <button
-                        className="btn btn-primary mr-2"
-                        onClick={captureSource}
-                        disabled={!watVision || !videoLoaded || isSourceCaptured}>
-                        Capture Source Frame
-                    </button>
-                    <button
-                        className={`btn ${processingActive ? 'btn-danger' : 'btn-success'} ml-2`}
-                        onClick={toggleProcessing}
-                        disabled={!isSourceCaptured}>
-                        {processingActive ? 'Stop Processing' : 'Start Processing'}
+                        className={`btn ${trackingScreen ? 'btn-danger' : 'btn-success'} ml-2`}
+                        onClick={toggleTrackingScreen}
+                        disabled={!watVision}>
+                        {trackingScreen ? 'Stop Tracking screen' : 'Start Tracking screen'}
                     </button>
                     <button
                         className="btn btn-info ml-2"
-                        onClick={explainScreen}>
+                        onClick={explainScreen}
+                        disabled={!watVision}>
                         Explain screen
+                    </button>
+                </div>
+            </div>
+            <div className="row mb-3">
+                <div className="col-12">
+                    <button
+                        className="btn btn-info ml-2"
+                        onClick={requestStartTrackingTouchScreen}
+                        disabled={!watVision}>
+                        Debug: Request start tracking touch screen
                     </button>
                 </div>
             </div>
@@ -278,6 +291,8 @@ function DebugVideo() {
                         src="/input.mp4"
                         className="img-fluid"
                         controls
+                        loop
+                        autoplay
                         muted
                         style={{ maxWidth: "100%" }}
                     />

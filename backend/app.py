@@ -132,32 +132,29 @@ def create_app():
     @socketio_error_handler
     def handle_disconnect(auth=None):
         print(f'Client disconnected: {request.sid}')
-        vision_manager.stop_recognition(request.sid)
         vision_manager.remove_connection(request.sid)
     
-    @socketio.on('start_recognition')
+    @socketio.on('start_session')
     @socketio_error_handler
-    def handle_start_recognition():
+    def handle_start_session():
         """Start continuous speech recognition"""
         session_id = request.sid
         print(f'Starting recognition for session {session_id}')
-        vision_manager.start_recognition(session_id)
+        vision_manager.start_session(session_id)
     
-    @socketio.on('stop_recognition')
+    @socketio.on('stop_session')
     @socketio_error_handler
-    def handle_stop_recognition():
+    def handle_stop_session():
         """Stop continuous speech recognition"""
         session_id = request.sid
         print(f'Stopping recognition for session {session_id}')
-        vision_manager.stop_recognition(session_id)
+        vision_manager.stop_session(session_id)
     
     @socketio.on('audio_chunk')
     @socketio_error_handler
     def handle_audio_chunk(data):
         """Handle incoming audio chunks"""
         session_id = request.sid
-        print(f'Received audio chunk from {session_id}')
-
         # Convert base64 to bytes if needed
         if isinstance(data, str):
             import base64
@@ -166,6 +163,21 @@ def create_app():
             audio_data = data
         
         vision_manager.process_audio_chunk(session_id, audio_data)
+
+    @socketio.on('debug_request_start_tracking_touchscreen')
+    @socketio_error_handler
+    def handle_debug_request_start_tracking_touchscreen():
+        """Debug request to start tracking touchscreen"""
+        session_id = request.sid
+        print(f'Starting touchscreen tracking for session {session_id}')
+        socketio.emit('start_tracking_touchscreen', room=session_id)
+
+    # Catch any other unhandled socket calls
+    @socketio.on('*')
+    @socketio_error_handler
+    def handle_unhandled_event(event, *args):
+        """Catch-all for unhandled events"""
+        print(f'Unhandled event {event} for session {request.sid} with args: {args}')
     
     return app, socketio
 
