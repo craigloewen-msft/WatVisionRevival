@@ -3,11 +3,8 @@ import os
 from dotenv import load_dotenv
 import wave
 import time
-from openai import AsyncAzureOpenAI
-from openai.resources.beta.realtime.realtime import AsyncRealtimeConnection
 import asyncio
 import base64
-import aiohttp
 import websockets
 import json
 from websockets import ClientConnection

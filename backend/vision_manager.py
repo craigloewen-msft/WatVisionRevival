@@ -1,26 +1,14 @@
 import os
-import time
-import json
 from azure.cognitiveservices.vision.computervision import ComputerVisionClient
 from msrest.authentication import CognitiveServicesCredentials
-from werkzeug.utils import secure_filename
 
 from fastapi import WebSocket
 
 import cv2
 import numpy as np
-import torch
-import tqdm
 
 import base64
 
-from PIL import Image
-import io
-
-from modules.xfeat import XFeat
-import matplotlib.pyplot as plt
-
-import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
@@ -31,8 +19,6 @@ from openai import AzureOpenAI
 from matching_service import MatchingService
 
 from typing import Dict
-
-import asyncio
 
 class VisionManager:
     def __init__(self):

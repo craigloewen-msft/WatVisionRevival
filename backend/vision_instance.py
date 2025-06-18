@@ -1,17 +1,9 @@
-import time
 import cv2
-from flask_socketio import SocketIO
 import numpy as np
-import tqdm
 import json
 import os
 
-from modules.xfeat import XFeat
-import matplotlib.pyplot as plt
-
 import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
 
 from azure.cognitiveservices.vision.computervision import ComputerVisionClient
 
@@ -22,15 +14,12 @@ from openai import AzureOpenAI
 import base64
 from mimetypes import guess_type
 
-import azure.cognitiveservices.speech as speechsdk
-
 from speech_service import ContinuousSpeechService
 
 from matching_service import MatchingService
 
 from fastapi import WebSocket
 
-import asyncio
 
 HAND_CONNECTIONS = mp.solutions.hands.HAND_CONNECTIONS
 
