@@ -64,7 +64,11 @@ class SpeechStreamingClient {
                 }
 
                 // Send audio chunk to backend
-                this.watvision_parent.socket.emit('audio_chunk', pcmData.buffer);
+                const uint8Array = new Uint8Array(pcmData.buffer);
+                const base64String = btoa(String.fromCharCode.apply(null, uint8Array));
+                this.watvision_parent.sendWebSocketMessage('audio_chunk', {
+                    audio: base64String,
+                });
             };
 
             // Connect audio nodes

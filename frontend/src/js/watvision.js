@@ -1,6 +1,5 @@
 import axios from "axios";
 import SpeechStreamingClient from "./speechStreaming";
-import io from 'socket.io-client';
 
 class WatVision {
 
@@ -24,62 +23,60 @@ class WatVision {
     async captureSourceImage() {
         let imgBlob = await this.getImageBlob(this.inputImageElement);
 
-        const formData = new FormData();
-        formData.append("source", imgBlob, "image.png");
-        formData.append("session_id", this.getSessionId());
+        const base64Image = await this.blobToBase64(imgBlob);
 
-        const response = await axios.post("/api/set_source_image/", formData, {
-            headers: {
-                "Content-Type": "multipart/form-data",
-            },
+        this.sendWebSocketMessage('set_source_image', {
+            image: base64Image,
+            session_id: this.getSessionId()
         });
 
-        if (response.data.success) {
-            this.sourceImageCaptured = true;
-        }
-
-        return response.data;
+        // Wait until 'this.sourceImageCaptured' is set to true
+        return new Promise((resolve) => {
+            const checkSourceImageCaptured = () => {
+                if (this.sourceImageCaptured) {
+                    resolve(true);
+                } else {
+                    setTimeout(checkSourceImageCaptured, 100); // Check every 100ms
+                }
+            };
+            checkSourceImageCaptured();
+        });
     }
 
     async step() {
-        let debugInputImageElement = this.debugInputImageElement;
-        let debugReferenceImageElement = this.debugReferenceImageElement;
-
         if (this.trackingScreen) {
             let imgBlob = await this.getImageBlob(this.inputImageElement);
 
-            const formData = new FormData();
-            formData.append("image", imgBlob, "image.png");
-            formData.append("session_id", this.getSessionId());
+            const base64Image = await this.blobToBase64(imgBlob);
 
-            const response = await axios.post("/api/step/", formData, {
-                headers: {
-                    "Content-Type": "multipart/form-data",
-                },
+            this.sendWebSocketMessage('step', {
+                image: base64Image,
+                session_id: this.getSessionId()
             });
 
-            if (response.data.success) {
-                let inputImageData = response.data.data.input_image;
-                let sourceImageData = response.data.data.source_image;
-                let textUnderFinger = response.data.data.text_under_finger;
-
-                debugInputImageElement.src = `data:image/png;base64,${inputImageData}`;
-                debugReferenceImageElement.src = `data:image/png;base64,${sourceImageData}`;
-
-                // Automatically read out text under finger if it exists and is different from last read text
-                if (textUnderFinger && textUnderFinger.text && textUnderFinger.text !== this.lastReadText) {
-                    this.speechClient.readTextAloud(textUnderFinger.text);
-                    this.lastReadText = textUnderFinger.text;
-                } else if (!textUnderFinger) {
-                    // Reset last read text when finger is not over any text
-                    this.lastReadText = null;
-                }
-            }
-
-            return response.data;
+            return true;
         }
         else {
             return null;
+        }
+    }
+
+    handleStepResponse(data) {
+        console.log("Handling step response:", data);
+        let inputImageData = data.data.input_image;
+        let sourceImageData = data.data.source_image;
+        let textUnderFinger = data.data.text_under_finger;
+
+        this.debugInputImageElement.src = `data:image/png;base64,${inputImageData}`;
+        this.debugReferenceImageElement.src = `data:image/png;base64,${sourceImageData}`;
+
+        // Automatically read out text under finger if it exists and is different from last read text
+        if (textUnderFinger && textUnderFinger.text && textUnderFinger.text !== this.lastReadText) {
+            this.speechClient.readTextAloud(textUnderFinger.text);
+            this.lastReadText = textUnderFinger.text;
+        } else if (!textUnderFinger) {
+            // Reset last read text when finger is not over any text
+            this.lastReadText = null;
         }
     }
 
@@ -140,106 +137,142 @@ class WatVision {
         this.audioTranscriptText = "";
         this.lastReadText = null;
         this.stopTrackingScreen();
-        this.speechClient.stopRecording();  
+        this.speechClient.stopRecording();
     }
 
     connect() {
         // Prevent multiple connections
-        if (this.socket && this.socket.connected) {
+        if (this.socket) {
             console.log("WatVision already connected, skipping connection attempt");
             return;
         }
-        
-        console.log("Connecting WatVision to backend...");
-        
-        // Connect to the backend WebSocket
-        this.socket = io('ws://localhost:8080', {
-            transports: ['websocket']
-        });
 
-        // Set up event listeners
-        this.socket.on('connected', (data) => {
-            console.log('Connected with session ID:', data.session_id);
-            this.sessionId = data.session_id;
-            this.onConnected?.(data.session_id);
-        });
+        console.log("Connecting to WatVision WebSocket server...");
+        this.socket = new WebSocket('ws://localhost:8080/ws');
 
-        this.socket.on('disconnect', () => {
-            console.log('Disconnected from server');
-            this.onDisconnect?.();
-        });
+        this.socket.onopen = () => {
+            console.log("Connected to WatVision WebSocket server");
+        }
 
-        this.socket.on('error', (error) => {
-            console.error('Socket error:', error);
-            this.stopSession();
-            this.reset();
-            this.onError?.(error);
-        });
+        this.socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            this.handleWebSocketMessage(data);
+        };
 
-        this.socket.onAny((eventName, data) => {
-            // console.log('Socket event received:', eventName, data);
-        });
+        this.socket.onclose = () => {
+            console.log('WebSocket disconnected');
+            // Attempt to reconnect after a delay
+            setTimeout(() => {
+                if (!this.socket || this.socket.readyState === WebSocket.CLOSED) {
+                    console.log("Hit error will try to reconnect");
+                }
+            }, 3000);
+        };
 
-        // Custom events
+        this.socket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+    }
 
-        this.socket.on('session_started', () => {
-            this.audioTranscriptText = ""; // Reset transcript text for new session
-            this.speechClient.startRecording();
-            this.onSessionStarted?.();
-        });
+    // Handle incoming WebSocket messages
+    handleWebSocketMessage(data) {
+        console.log('Received WebSocket message:', data);
 
-        this.socket.on('session_stopped', () => {
-            this.reset();
-            this.onSessionStopped?.();
-        });
+        switch (data.type) {
+            case 'connected':
+                console.log('Connected with session ID:', data.session_id);
+                this.sessionId = data.session_id;
+                this.onConnected?.(data.session_id);
+                break;
 
-        this.socket.on('response.audio_transcript.delta', (data) => {
-            this.audioTranscriptText += data.delta;
-            this.onAudioTranscriptDelta?.(data.delta);
-        });
+            case 'disconnect':
+                console.log('Disconnected from server');
+                this.onDisconnect?.();
+                break;
 
-        this.socket.on('response.audio.delta', (data) => {
-            this.speechClient.playAudioDelta(data.delta);
-        });
+            case 'error':
+                console.error('Socket error:', data.message || data); // in case error is just a string or object
+                this.stopSession?.();
+                this.reset?.();
+                this.onError?.(data.message || data);
+                break;
 
-        this.socket.on('start_tracking_touchscreen', () => {
-            console.log("Received start_tracking_screen event");
-            this.startTrackingScreen();
-        });
+            case 'session_started':
+                this.audioTranscriptText = ""; // Reset transcript text for new session
+                this.speechClient?.startRecording();
+                this.onSessionStarted?.();
+                break;
 
-        this.socket.on('stop_tracking_touchscreen', () => {
-            this.stopTrackingScreen();
-        });
+            case 'session_stopped':
+                this.reset?.();
+                this.onSessionStopped?.();
+                break;
+
+            case 'response.audio_transcript.delta':
+                this.audioTranscriptText += data.event.delta;
+                this.onAudioTranscriptDelta?.(data.event.delta);
+                break;
+
+            case 'response.audio.delta':
+                this.speechClient?.playAudioDelta(data.event.delta);
+                break;
+
+            case 'start_tracking_touchscreen':
+                this.startTrackingScreen?.();
+                break;
+
+            case 'stop_tracking_touchscreen':
+                this.stopTrackingScreen?.();
+                break;
+
+            case 'source_image_captured':
+                console.log("Source image captured successfully");
+                this.sourceImageCaptured = true;
+                break;
+
+            case 'source_image_set':
+                console.log("Source image set successfully");
+                this.sourceImageCaptured = true;
+                break;
+
+            case 'step_response':
+                this.handleStepResponse(data);
+                break;
+
+            default:
+                console.log('Unhandled message type:', data.type);
+        }
     }
 
     disconnect() {
         console.log("Disconnecting WatVision instance...");
-        
+
         if (this.speechClient) {
             this.speechClient.stopRecording();
         }
-        
+
         if (this.socket) {
-            this.socket.disconnect();
+            this.socket.close();
             this.socket = null;
         }
-        
+
         this.reset();
     }
 
     async startSession() {
         // Start recognition session
-        this.socket.emit('start_session');
+        this.sendWebSocketMessage('start_session');
     }
 
     async stopSession() {
         // Stop recognition session
-        this.socket.emit('stop_session');
+        this.sendWebSocketMessage('stop_session');
         this.reset();
     }
 
     async startTrackingScreen() {
         if (!this.sourceImageCaptured) {
+            console.log("Capturing source image");
             await this.captureSourceImage();
         }
 
@@ -284,6 +317,31 @@ class WatVision {
 
     setExternalTrackingScreen(setIsTracking) {
         this.externalTrackingScreen = setIsTracking;
+    }
+
+    blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                // Remove the "data:image/png;base64," prefix
+                const base64 = reader.result.split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    // Send WebSocket message
+    sendWebSocketMessage(type, data = {}) {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+                type: type,
+                ...data
+            }));
+        } else {
+            console.error('WebSocket not connected');
+        }
     }
 }
 

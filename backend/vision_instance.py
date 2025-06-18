@@ -28,6 +28,8 @@ from speech_service import ContinuousSpeechService
 
 from matching_service import MatchingService
 
+from fastapi import WebSocket
+
 import asyncio
 
 HAND_CONNECTIONS = mp.solutions.hands.HAND_CONNECTIONS
@@ -72,7 +74,7 @@ class VisionInstance:
         llm_client: AzureOpenAI, 
         matching_service: MatchingService,
         session_id: str,
-        socketio: SocketIO
+        websocket: WebSocket 
     ):
         self.source_image = None
         self.input_image = None
@@ -89,7 +91,9 @@ class VisionInstance:
 
         self.computer_vision_client = computer_vision_client
 
-        self.speech_service = ContinuousSpeechService(socketio, session_id, self)
+        self.speech_service = ContinuousSpeechService(websocket, session_id, self)
+
+        self.websocket = websocket
 
         self.matching_service = matching_service
 
@@ -99,11 +103,13 @@ class VisionInstance:
         with open(data_path, 'r') as file:
             self.test_data = json.load(file, object_hook=lambda d: SimpleNamespace(**d))
 
-    def set_source_image(self, source_image: np.ndarray, image_path):
+    async def set_source_image(self, source_image: np.ndarray, image_path):
         self.source_image = source_image
         self.source_debug_image = source_image.copy()
 
         self.text_info = self.__get_text_info(image_path)
+
+        await self.speech_service.finalize_start_touching_touchscreen()
 
         return True
 
@@ -527,20 +533,21 @@ You will keep your answers short and sweet. You will be shown an image of a touc
         
         return response.choices[0].message.content.strip()
     
-    def start_session(self):
+    async def start_session(self):
         """
         Starts the speech recognition service.
         """
-        return asyncio.run(self.speech_service.start_session())
+        self.speech_service = ContinuousSpeechService(self.websocket, self.session_id, self)
+        return await self.speech_service.start_session()
 
-    def stop_session(self):
+    async def stop_session(self):
         """
         Stops the speech recognition service.
         """
-        return asyncio.run(self.speech_service.stop_session())
+        return await self.speech_service.stop_session()
 
-    def process_audio_chunk(self, audio_chunk):
+    async def process_audio_chunk(self, audio_chunk):
         """
         Processes an audio chunk for speech recognition.
         """
-        return asyncio.run(self.speech_service.process_audio_chunk(audio_chunk))
+        return await self.speech_service.process_audio_chunk(audio_chunk)

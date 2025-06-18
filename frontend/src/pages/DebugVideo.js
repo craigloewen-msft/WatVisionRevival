@@ -204,7 +204,7 @@ function DebugVideo() {
     const requestStartTrackingTouchScreen = () => {
         if (!watVision) return;
         console.log("Requesting start tracking touch screen...");
-        watVision.socket.emit('debug_request_start_tracking_touchscreen');
+        watVision.sendWebSocketMessage('debug_request_start_tracking_touchscreen');
     };
 
     // Return the component JSX
@@ -292,7 +292,7 @@ function DebugVideo() {
                         className="img-fluid"
                         controls
                         loop
-                        autoplay
+                        autoPlay
                         muted
                         style={{ maxWidth: "100%" }}
                     />

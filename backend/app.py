@@ -1,17 +1,52 @@
-from flask import Flask, request, jsonify, send_from_directory
-from vision_manager import VisionManager  # Assuming VisionManager is implemented in Python
-from flask_socketio import SocketIO, emit, join_room, leave_room
+from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket, WebSocketDisconnect, Form
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 import os
+import json
+import traceback
+import asyncio
+import base64
+from typing import Dict, List
+from contextlib import asynccontextmanager
+import uuid
+
+from vision_manager import VisionManager
 from dotenv import load_dotenv
 
-import numpy as np
-import os
-
-import traceback
-
-from functools import wraps
-
 load_dotenv()
+
+vision_manager = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle startup and shutdown events"""
+    global vision_manager
+    
+    # Startup
+    print("Starting up FastAPI application...")
+    vision_manager = VisionManager()
+    yield
+    
+    # Shutdown
+    print("Shutting down FastAPI application...")
+
+# Create FastAPI app
+app = FastAPI(
+    title="WatVision API",
+    description="Computer Vision API with WebSocket support",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure this properly for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Determine the port and environment
 if os.getenv('NODE_ENV') == "production":
@@ -21,171 +56,178 @@ else:
     host_port = int(os.getenv('PORT', 8080))
     print("Running as development!")
 
-# Check for SSL certificate files
-cert_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'ssl', 'server.crt')
-key_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'ssl', 'server.key')
-ssl_context = None
-if os.path.exists(cert_path) and os.path.exists(key_path):
-    ssl_context = (cert_path, key_path)
-    print("SSL certificates found, HTTPS enabled")
-else:
-    print("SSL certificates not found, running without HTTPS")
+# # Check for SSL certificate files
+# cert_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'ssl', 'server.crt')
+# key_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'ssl', 'server.key')
+# ssl_context = None
 
-def socketio_error_handler(func):
-    """Decorator to handle exceptions in SocketIO event handlers"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        session_id = request.sid
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            print(f'Error in {func.__name__} for session {session_id}: {e}')
-            print('===ERROR ON REQUEST===')
-            print(f'Error: {str(e)}')
-            print(f'Traceback:\n{traceback.format_exc()}')
-            print('=======================')
-            emit('error', {'message': str(e)})
-    return wrapper
+# if os.path.exists(cert_path) and os.path.exists(key_path):
+#     ssl_context = (cert_path, key_path)
+#     print("SSL certificates found, HTTPS enabled")
+# else:
+#     print("SSL certificates not found, running without HTTPS")
 
-def api_error_handler(func):
-    """Decorator to handle exceptions in API route handlers"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            print(f'Error in {func.__name__}: {e}')
-            print('===ERROR ON REQUEST===')
-            print(f'Error: {str(e)}')
-            print(f'Traceback:\n{traceback.format_exc()}')
-            print('=======================')
-            return jsonify(success=False, error=str(e))
-    return wrapper
+# Mount static files
+app.mount("/dist", StaticFiles(directory="dist"), name="static")
 
-def create_app():
-    app = Flask(__name__)
-    app.config['UPLOAD_FOLDER'] = '/tmp'  # Temporary folder for file uploads
-    
-    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+# API Routes
+@app.get("/api/")
+async def api_root():
+    """Health check endpoint"""
+    return {"success": True, "message": "API is working!"}
 
-    global vision_manager
-    vision_manager = VisionManager(socketio)
-    
-    # Serve static files
-    @app.route('/dist/<path:path>')
-    def serve_static(path):
-        return send_from_directory(os.path.join(os.getcwd(), 'dist'), path)
-
-    @app.route('/api/')
-    def api():
-        return jsonify(success=True, message="API is working!")
-    
-    @app.route('/api/set_source_image/', methods=['POST'])
-    @api_error_handler
-    def set_source_image():
-        if 'source' not in request.files:
-            return jsonify(success=False, error="No file part")
-        
-        # Check if the session ID is provided
-        session_id = request.form.get('session_id')
+@app.post("/api/explain_screen/")
+async def explain_screen(session_id: str = Form(...)):
+    """Get current image description"""
+    try:
         if not session_id:
-            return jsonify(success=False, error="Session ID is required")
-        
-        result = vision_manager.set_source_image(session_id, request.files['source'])
-        return jsonify(success=True, data=result)
-    
-    @app.route('/api/step/', methods=['POST'])
-    @api_error_handler
-    def step():
-        if 'image' not in request.files:
-            return jsonify(success=False, error="No file part")
-        
-        # Check if the session ID is provided
-        session_id = request.form.get('session_id')
-        if not session_id:
-            return jsonify(success=False, error="Session ID is required")
-        
-        result = vision_manager.step(session_id, request.files['image'])
-        return jsonify(success=True, data=result)
-    
-    @app.route('/api/explain_screen/', methods=['POST'])
-    @api_error_handler
-    def explain_screen():
-        # Check if the session ID is provided
-        session_id = request.form.get('session_id')
-        if not session_id:
-            return jsonify(success=False, error="Session ID is required")
+            raise HTTPException(status_code=400, detail="Session ID is required")
 
         result = vision_manager.get_current_image_description(session_id)
-        return jsonify(success=True, data=result)
+        return {"success": True, "data": result}
     
-    # WebSocket event handlers
-    @socketio.on('connect')
-    @socketio_error_handler
-    def handle_connect(auth=None):
-        print(f'Client connected: {request.sid}')
-        join_room(request.sid)
-        vision_manager.add_connection(request.sid)
-        emit('connected', {'session_id': request.sid})
-    
-    @socketio.on('disconnect')
-    @socketio_error_handler
-    def handle_disconnect(auth=None):
-        print(f'Client disconnected: {request.sid}')
-        vision_manager.remove_connection(request.sid)
-    
-    @socketio.on('start_session')
-    @socketio_error_handler
-    def handle_start_session():
-        """Start continuous speech recognition"""
-        session_id = request.sid
-        print(f'Starting recognition for session {session_id}')
-        vision_manager.start_session(session_id)
-    
-    @socketio.on('stop_session')
-    @socketio_error_handler
-    def handle_stop_session():
-        """Stop continuous speech recognition"""
-        session_id = request.sid
-        print(f'Stopping recognition for session {session_id}')
-        vision_manager.stop_session(session_id)
-    
-    @socketio.on('audio_chunk')
-    @socketio_error_handler
-    def handle_audio_chunk(data):
-        """Handle incoming audio chunks"""
-        session_id = request.sid
-        # Convert base64 to bytes if needed
-        if isinstance(data, str):
-            import base64
-            audio_data = base64.b64decode(data)
-        else:
-            audio_data = data
+    except Exception as e:
+        print(f'Error in explain_screen: {e}')
+        print(f'Traceback:\n{traceback.format_exc()}')
+        raise HTTPException(status_code=500, detail=str(e))
+
+# @app.post("/api/set_source_image/")
+# async def set_source_image(
+#     session_id: str = Form(...),
+#     source: UploadFile = File(...)
+# ):
+#     """Set source image for comparison"""
+#     try:
+#         if not session_id:
+#             raise HTTPException(status_code=400, detail="Session ID is required")
         
-        vision_manager.process_audio_chunk(session_id, audio_data)
+#         if not source:
+#             raise HTTPException(status_code=400, detail="No source file provided")
+        
+#         result = await vision_manager.set_source_image(session_id, source)
 
-    @socketio.on('debug_request_start_tracking_touchscreen')
-    @socketio_error_handler
-    def handle_debug_request_start_tracking_touchscreen():
-        """Debug request to start tracking touchscreen"""
-        session_id = request.sid
-        print(f'Starting touchscreen tracking for session {session_id}')
-        socketio.emit('start_tracking_touchscreen', room=session_id)
-
-    # Catch any other unhandled socket calls
-    @socketio.on('*')
-    @socketio_error_handler
-    def handle_unhandled_event(event, *args):
-        """Catch-all for unhandled events"""
-        print(f'Unhandled event {event} for session {request.sid} with args: {args}')
+#         return {"success": True, "data": result}
     
-    return app, socketio
+#     except Exception as e:
+#         print(f'Error in set_source_image: {e}')
+#         print(f'Traceback:\n{traceback.format_exc()}')
+#         raise HTTPException(status_code=500, detail=str(e))
 
-# Create the app instance
-app, socketio = create_app()
+# WebSocket endpoint
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time communication"""
+    print("Got websocket connection")
+    await websocket.accept()
+    
+    # Generate ranodm session ID
+    session_id = str(uuid.uuid4())
+    print(f'Client connected: {session_id}')
+    
+    try:
+        # Add connection to vision manager
+        vision_manager.add_connection(session_id, websocket)
+        
+        # Send connection confirmation
+        await websocket.send_json({
+            "type": "connected",
+            "session_id": session_id
+        })
+        
+        # Handle incoming messages
+        while True:
+            try:
+                data = await websocket.receive_json()
+                await handle_websocket_message(session_id, data, websocket)
+            except WebSocketDisconnect as e:
+                raise WebSocketDisconnect
+            except Exception as e:
+                print(f"Error handling WebSocket message for {session_id}: {e}")
+                await websocket.send_json({
+                    "type": "error",
+                    "message": str(e)
+                })
+                
+    except WebSocketDisconnect:
+        print(f'Client disconnected: {session_id}')
+    except Exception as e:
+        print(f'WebSocket error for {session_id}: {e}')
+        print(f'Traceback:\n{traceback.format_exc()}')
+    finally:
+        # Clean up
+        await vision_manager.remove_connection(session_id)
 
-if __name__ == '__main__':
-    if ssl_context:
-        socketio.run(app, host='0.0.0.0', port=host_port, ssl_context=ssl_context)
-    else:
-        socketio.run(app, host='0.0.0.0', port=host_port)
+async def handle_websocket_message(session_id: str, data: dict, websocket: WebSocket):
+    """Handle different types of WebSocket messages"""
+    message_type = data.get("type", "")
+    
+    try:
+        if message_type == "start_session":
+            print(f'Starting recognition for session {session_id}')
+            await vision_manager.start_session(session_id)
+            
+        elif message_type == "stop_session":
+            print(f'Stopping recognition for session {session_id}')
+            await vision_manager.stop_session(session_id)
+            
+        elif message_type == "audio_chunk":
+            # Handle incoming audio chunks
+            audio_data = data.get("audio", "")
+            if isinstance(audio_data, str):
+                audio_data = base64.b64decode(audio_data)
+            await vision_manager.process_audio_chunk(session_id, audio_data)
+            
+        elif message_type == "debug_request_start_tracking_touchscreen":
+            print(f'Starting touchscreen tracking for session {session_id}')
+            await websocket.send_json({
+                "type": "start_tracking_touchscreen"
+            })
+
+        elif message_type == "step":
+            source_image = data.get("image", None)
+            if not source_image:
+                raise ValueError("Source image is required")
+            
+            # Decode base64 image
+            source_image_bytes = base64.b64decode(source_image)
+            
+            result = vision_manager.step(session_id, source_image_bytes)
+            await websocket.send_json({
+                "type": "step_response",
+                "data": result
+            })
+
+
+        elif message_type == "set_source_image":
+            source_image = data.get("image", None)
+            if not source_image:
+                raise ValueError("Source image is required")
+            
+            # Decode base64 image
+            source_image_bytes = base64.b64decode(source_image)
+            
+            result = await vision_manager.set_source_image(session_id, source_image_bytes)
+            await websocket.send_json({
+                "type": "source_image_set",
+                "data": result
+            })
+            
+        else:
+            print(f'Unhandled message type {message_type} for session {session_id}')
+            
+    except Exception as e:
+        print(f'Error handling message type {message_type}: {e}')
+        await websocket.send_json({
+            "type": "error",
+            "message": str(e)
+        })
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "app:app",
+        host="0.0.0.0",
+        port=host_port,
+        reload=True
+    )

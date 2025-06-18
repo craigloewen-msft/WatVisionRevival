@@ -13,12 +13,14 @@ import json
 from websockets import ClientConnection
 from typing import TYPE_CHECKING
 
+from fastapi import WebSocket
+
 if TYPE_CHECKING:
     from vision_instance import VisionInstance
 
 class ContinuousSpeechService:
-    def __init__(self, socketio, session_id: str, parent_vision_instance: "VisionInstance"):
-        self.socketio = socketio
+    def __init__(self, main_websocket: WebSocket, session_id: str, parent_vision_instance: "VisionInstance"):
+        self.main_websocket = main_websocket
         self.session_info = None
 
         self.session_id = session_id
@@ -42,6 +44,8 @@ class ContinuousSpeechService:
         self._event_task = None
 
         self.tokenUsageCount = 0
+
+        self.start_touch_screen_function_call_id = None
     
     async def start_session(self):
         """Start continuous recognition for a session"""
@@ -60,37 +64,29 @@ class ContinuousSpeechService:
             self.debug_audio_file.setframerate(24000)  # 16kHz
             print(f"Debug: Recording audio to {debug_filename}")
         
-        await self._event_task
+        # await self._event_task
         return True
     
     async def stop_session(self):
         """Stop recognition and clean up"""
         self.is_running = False
 
-        # if self.connection:
-        #     print("Commmitting audio buffer")
-        #     await self.connection.input_audio_buffer.commit()
-
-        # if self._event_task:
-        #     try: 
-        #         self._event_task.cancel()
-        #     except asyncio.CancelledError:
-        #         print("Event processing task cancelled")
+        if self._event_task:
+            try: 
+                self._event_task.cancel()
+            except asyncio.CancelledError:
+                print("Event processing task cancelled")
 
         # if self.connection_manager:
         #     await self.connection_manager.__aexit__(None, None, None)
 
-        # # Close debug audio file
+        # Close debug audio file
         # if self.debug_recording and self.debug_audio_file:
         #     self.debug_audio_file.close()
         #     print("Debug: Audio file saved and closed")
 
         print(f"Session {self.session_id} ending. Total tokens used: {self.tokenUsageCount}")
 
-        self.socketio.emit('session_stopped', {}, room=self.session_id)
-
-        if self.websocket:
-            self.websocket = None
 
     async def _process_events(self):
         """Process events from the realtime connection"""
@@ -175,7 +171,9 @@ When starting say hello and ask the user to to tell you when they are ready to s
             }
             await websocket.send(json.dumps(response_request))
 
-            self.socketio.emit('session_started', {}, room=self.session_id)
+            await self.main_websocket.send_json({
+                "type": "session_started"
+            })
 
             async for message in websocket:
                 event = json.loads(message)
@@ -186,9 +184,15 @@ When starting say hello and ask the user to to tell you when they are ready to s
                 print(f"Debug: Received event of type {event_type}")
                     
                 if event_type == "response.audio_transcript.delta":
-                    self.socketio.emit('response.audio_transcript.delta', event, room=self.session_id)
+                    await self.main_websocket.send_json({
+                        "type": "response.audio_transcript.delta",
+                        "event": event
+                    })
                 elif event_type == "response.audio.delta":
-                    self.socketio.emit('response.audio.delta', event, room=self.session_id)
+                    await self.main_websocket.send_json({
+                        "type": "response.audio.delta",
+                        "event": event
+                    })
                 elif event_type == "response.done":
                     usage = event.get('response', {}).get('usage', {})
 
@@ -202,14 +206,18 @@ When starting say hello and ask the user to to tell you when they are ready to s
                         if call.get('type') == 'function_call':
                             await self.__process_function_call(call)
 
-                    self.socketio.emit('response.done', event, room=self.session_id)
+                    await self.main_websocket.send_json({
+                        "type": "response.done",
+                        "event": event
+                    })
                 elif event_type == "error":
                     print("===RECEIVED ERROR from OpenAI realtime service===")
                     print(event)
-                    self.socketio.emit('error', event, room=self.session_id)
+                    await self.main_websocket.send_json({
+                        "type": "error",
+                        "event": event
+                    })
                     await self.stop_session()
-                # else:
-                #     self.socketio.emit(event_type, {}, room=self.session_id)
 
         print("Debug: Event processing loop ended")
 
@@ -226,11 +234,15 @@ When starting say hello and ask the user to to tell you when they are ready to s
         function_output = ""
         
         if function_name == "start_tracking_touchscreen":
-            self.socketio.emit('start_tracking_touchscreen', {}, room=self.session_id)
-            function_output = "Success"
+            await self.main_websocket.send_json({
+                "type": "start_tracking_touchscreen",
+            })
+            self.start_touch_screen_function_call_id = function_call.get('call_id')
         elif function_name == "stop_tracking_touchscreen":
-            self.socketio.emit('stop_tracking_touchscreen', {}, room=self.session_id)
-            function_output = "Success"
+            await self.main_websocket.send_json({
+                "type": "stop_tracking_touchscreen",
+            })
+            function_output = "Stopped tracking touch screen."
         elif function_name == "get_description_of_touchscreen":
             function_output = self.parent_vision_instance.get_current_image_description()
 
@@ -252,9 +264,6 @@ When starting say hello and ask the user to to tell you when they are ready to s
                 }
             }
             await self.websocket.send(json.dumps(response_request))
-
-
-        
     
     async def process_audio_chunk(self, audio_data):
         """Process incoming audio chunk"""
@@ -280,3 +289,23 @@ When starting say hello and ask the user to to tell you when they are ready to s
         # Also record to debug file if enabled
         if self.debug_recording and self.debug_audio_file and isinstance(audio_data, bytes):
             self.debug_audio_file.writeframes(audio_data)
+
+    async def finalize_start_touching_touchscreen(self):
+        if self.start_touch_screen_function_call_id:
+            function_response = {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "function_call_output",
+                    "call_id": self.start_touch_screen_function_call_id,
+                    "output": "{\"result\": \"" + "Touch screen recognition started and is ready for the user." + "\"}"
+                }
+            }
+            await self.websocket.send(json.dumps(function_response))
+
+            response_request = {
+                "type": "response.create",
+                "response": {
+                    "modalities": ["text", "audio"]
+                }
+            }
+            await self.websocket.send(json.dumps(response_request))
