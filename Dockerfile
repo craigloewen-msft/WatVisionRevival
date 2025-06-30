@@ -35,6 +35,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Then, use a final image without uv
 FROM debian:bookworm-slim
 
+RUN apt-get update && apt-get install ffmpeg libsm6 libxext6 -y
+
 # Copy the Python version
 COPY --from=builder /python /python
 
@@ -42,11 +44,11 @@ COPY --from=builder /python /python
 COPY --from=builder /app /app
 
 # Copy built frontend into the backend's static directory (adjust path as needed)
-COPY --from=frontend-builder /frontend/build /app/backend/dist
+COPY --from=frontend-builder /frontend/build /app/dist
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
-RUN apt-get update && apt-get install ffmpeg libsm6 libxext6 -y
+WORKDIR /app/backend
 
-CMD ["fastapi", "run", "backend/app.py"]
+CMD ["fastapi", "run", "app.py"]

@@ -103,31 +103,15 @@ class VisionInstance:
         return True
 
     def step(self, input_image: np.ndarray):
-        import time
-        start_time = time.time()
-        timing_data = {}
-
         self.input_image = input_image
         self.input_debug_image = input_image.copy()
         self.source_debug_image = self.source_image.copy()
 
-        # Time hands detection
-        hands_start = time.time()
         hands_info = self.__detect_hands(self.input_image)
-        hands_end = time.time()
-        timing_data['hands_detection'] = hands_end - hands_start
 
-        # Time homography calculation
-        homography_start = time.time()
         homography = self.__get_homography(self.input_image, self.source_image)
-        homography_end = time.time()
-        timing_data['homography'] = homography_end - homography_start
 
-        # Time finger tip location calculation
-        fingertip_start = time.time()
         input_finger_tip_location, source_finger_tip_location = self.__get_finger_tip_location(hands_info, homography, self.input_image)
-        fingertip_end = time.time()
-        timing_data['finger_tip_location'] = fingertip_end - fingertip_start
         
         # Store the latest source finger position and check for text under finger
         text_under_finger = None
@@ -137,35 +121,9 @@ class VisionInstance:
             if text_under_finger:
                 print(f"Text under finger: {text_under_finger['text']}")
 
-        # Time debug info drawing
-        debug_start = time.time()
         self.__draw_debug_info(self.input_debug_image, self.source_debug_image, homography, hands_info, input_finger_tip_location, source_finger_tip_location, text_under_finger)
-        debug_end = time.time()
-        timing_data['draw_debug_info'] = debug_end - debug_start
-
-        # Calculate total time
-        end_time = time.time()
-        total_time = end_time - start_time
-
-        # Print timing table
-        self.__print_timing_table(timing_data, total_time)
 
         return self.input_debug_image, self.source_debug_image, text_under_finger
-
-    def __print_timing_table(self, timing_data, total_time):
-        """Prints a formatted table of timing data"""
-        print("\n--- Performance Timing ---")
-        print(f"{'Function':<25} {'Time (ms)':<15} {'Percentage':<10}")
-        print("-" * 50)
-        
-        for func_name, time_taken in timing_data.items():
-            ms_time = time_taken * 1000  # Convert to milliseconds
-            percentage = (time_taken / total_time) * 100
-            print(f"{func_name:<25} {ms_time:<15.2f} {percentage:<10.2f}%")
-        
-        print("-" * 50)
-        print(f"{'Total':<25} {(total_time * 1000):<15.2f} {'100.00':<10}%")
-        print("-------------------------\n")
 
     def __detect_hands(self, input_image):
 

@@ -63,11 +63,8 @@ else:
 # else:
 #     print("SSL certificates not found, running without HTTPS")
 
-# Mount static files
-app.mount("/dist", StaticFiles(directory="dist"), name="static")
-
 # API Routes
-@app.get("/api/")
+@app.get("/api")
 async def api_root():
     """Health check endpoint"""
     return {"success": True, "message": "API is working!"}
@@ -217,6 +214,9 @@ async def handle_websocket_message(session_id: str, data: dict, websocket: WebSo
             "type": "error",
             "message": str(e)
         })
+
+# Mount static files
+app.mount("/", StaticFiles(directory="dist", html = True), name="dist")
 
 if __name__ == "__main__":
     import uvicorn

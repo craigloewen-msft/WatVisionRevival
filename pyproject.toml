@@ -8,9 +8,18 @@ dependencies = [
     "azure-cognitiveservices-vision-computervision>=0.9.1",
     "dotenv>=0.9.9",
     "fastapi[standard]>=0.115.13",
+    "kornia>=0.8.1",
     "mediapipe>=0.10.14",
     "numpy>=2.3.0",
     "openai[realtime]>=1.88.0",
     "opencv-python>=4.11.0.86",
-    "torch>=2.7.1",
+    "torch==2.3.0"
 ]
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

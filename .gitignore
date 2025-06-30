@@ -15,3 +15,5 @@ nohup.out
 *.crt
 
 *.key
+
+*/build

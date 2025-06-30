@@ -147,8 +147,9 @@ class WatVision {
             return;
         }
 
-        console.log("Connecting to WatVision WebSocket server...");
-        this.socket = new WebSocket('ws://localhost:8080/ws');
+        const wsUrl = this.getWebSocketUrl();
+        console.log("Connecting to WatVision WebSocket server at:", wsUrl);
+        this.socket = new WebSocket(wsUrl);
 
         this.socket.onopen = () => {
             console.log("Connected to WatVision WebSocket server");
@@ -342,6 +343,13 @@ class WatVision {
         } else {
             console.error('WebSocket not connected');
         }
+    }
+
+    getWebSocketUrl() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.hostname;
+        const port = process.env.NODE_ENV === 'production' ? '' : ':8000';
+        return `${protocol}//${host}${port}/ws`;
     }
 }
 
