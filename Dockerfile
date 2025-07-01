@@ -41,16 +41,17 @@ RUN apt-get update && apt-get install ffmpeg libsm6 libxext6 -y
 COPY --from=builder /python /python
 
 # Copy the application from the builder
-COPY --from=builder /app /app
+COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder /app/backend /app/backend
 
 # Copy built frontend into the backend's static directory (adjust path as needed)
-COPY --from=frontend-builder /frontend/build /app/dist
+COPY --from=frontend-builder /frontend/build /app/backend/dist
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
 ARG GIT_COMMIT=unknown
-ENV REACT_APP_GIT_COMMIT=$GIT_COMMIT
+ENV GIT_COMMIT=$GIT_COMMIT
 
 WORKDIR /app/backend
 

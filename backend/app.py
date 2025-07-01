@@ -49,7 +49,7 @@ if os.getenv('NODE_ENV') == "production":
     host_port = int(os.getenv('PORT', 3000))
     print("Running as production!")
 else:
-    host_port = int(os.getenv('PORT', 8080))
+    host_port = int(os.getenv('PORT', 8000))
     print("Running as development!")
 
 # # Check for SSL certificate files
@@ -72,7 +72,7 @@ async def api_root():
 @app.get("/api/version")
 async def get_version():
     """Get version information including git commit hash"""
-    git_commit = os.getenv('GIT_COMMIT', 'unknown')
+    git_commit = os.getenv('GIT_COMMIT', 'env-not-set')
     return {
         "success": True,
         "data": {

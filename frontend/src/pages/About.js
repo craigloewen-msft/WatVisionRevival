@@ -8,18 +8,6 @@ function About() {
   useEffect(() => {
     const fetchVersionInfo = async () => {
       try {
-        // Try to get from environment variable first (for development)
-        const envCommit = process.env.REACT_APP_GIT_COMMIT;
-        
-        if (envCommit && envCommit !== 'unknown') {
-          setVersionInfo({
-            git_commit: envCommit,
-          });
-          setLoading(false);
-          return;
-        }
-
-        // Fallback to API call (for production)
         const response = await axios.get('/api/version');
         if (response.data.success) {
           setVersionInfo(response.data.data);
@@ -28,7 +16,7 @@ function About() {
         console.error('Failed to fetch version info:', error);
         // Set fallback info
         setVersionInfo({
-          git_commit: 'unknown',
+          git_commit: 'Received error from API',
         });
       } finally {
         setLoading(false);
@@ -38,25 +26,18 @@ function About() {
     fetchVersionInfo();
   }, []);
 
-  const formatCommitHash = (hash) => {
-    if (!hash || hash === 'unknown') return 'Unknown';
-    return hash.length > 8 ? hash.substring(0, 8) : hash;
-  };
-
   return (
     <div className="page-container">
       <h1>About Us</h1>
-      <p>This is the about page of our application.</p>
+      <p>This is the about page of our application!</p>
       
-      <div className="version-info" style={{ marginTop: '2rem', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+      <div className="version-info">
         <h3>Version Information</h3>
         {loading ? (
           <p>Loading version information...</p>
         ) : (
           <div>
-            <p><strong>Version:</strong> {versionInfo?.version || 'Unknown'}</p>
-            <p><strong>Commit:</strong> {formatCommitHash(versionInfo?.git_commit)}</p>
-            {versionInfo?.git_commit && versionInfo.git_commit !== 'unknown' && (
+            {versionInfo?.git_commit && (
               <p style={{ fontSize: '0.8rem', color: '#666' }}>
                 Full commit hash: <code>{versionInfo.git_commit}</code>
               </p>
