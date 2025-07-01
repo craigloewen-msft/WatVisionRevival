@@ -347,8 +347,8 @@ class WatVision {
 
     getWebSocketUrl() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.hostname;
-        const port = process.env.NODE_ENV === 'production' ? '' : ':8000';
+        const host = process.env.NODE_ENV === 'development' ? window.location.hostname : "watvisionrevival-f8hfb8gpf5begkau.eastus2-01.azurewebsites.net";
+        const port = process.env.NODE_ENV === 'development' ? ':8000' : '';
         return `${protocol}//${host}${port}/ws`;
     }
 }

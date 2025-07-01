@@ -69,6 +69,17 @@ async def api_root():
     """Health check endpoint"""
     return {"success": True, "message": "API is working!"}
 
+@app.get("/api/version")
+async def get_version():
+    """Get version information including git commit hash"""
+    git_commit = os.getenv('GIT_COMMIT', 'unknown')
+    return {
+        "success": True,
+        "data": {
+            "git_commit": git_commit,
+        }
+    }
+
 @app.post("/api/explain_screen/")
 async def explain_screen(session_id: str = Form(...)):
     """Get current image description"""

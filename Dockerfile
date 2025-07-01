@@ -49,6 +49,9 @@ COPY --from=frontend-builder /frontend/build /app/dist
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
+ARG GIT_COMMIT=unknown
+ENV REACT_APP_GIT_COMMIT=$GIT_COMMIT
+
 WORKDIR /app/backend
 
-CMD ["fastapi", "run", "app.py"]
+CMD ["python", "app.py"]
