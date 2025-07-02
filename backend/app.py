@@ -188,19 +188,7 @@ async def handle_websocket_message(session_id: str, data: dict, websocket: WebSo
             })
 
         elif message_type == "step":
-            source_image = data.get("image", None)
-            if not source_image:
-                raise ValueError("Source image is required")
-            
-            # Decode base64 image
-            source_image_bytes = base64.b64decode(source_image)
-            
-            result = vision_manager.step(session_id, source_image_bytes)
-            await websocket.send_json({
-                "type": "step_response",
-                "data": result
-            })
-
+            await vision_manager.step(session_id, data)
 
         elif message_type == "set_source_image":
             source_image = data.get("image", None)
@@ -210,17 +198,14 @@ async def handle_websocket_message(session_id: str, data: dict, websocket: WebSo
             # Decode base64 image
             source_image_bytes = base64.b64decode(source_image)
             
-            result = await vision_manager.set_source_image(session_id, source_image_bytes)
-            await websocket.send_json({
-                "type": "source_image_set",
-                "data": result
-            })
+            await vision_manager.set_source_image(session_id, source_image_bytes)
             
         else:
             print(f'Unhandled message type {message_type} for session {session_id}')
             
     except Exception as e:
         print(f'Error handling message type {message_type}: {e}')
+        print(f'Traceback:\n{traceback.format_exc()}')
         await websocket.send_json({
             "type": "error",
             "message": str(e)

@@ -20,6 +20,7 @@ from matching_service import MatchingService
 
 from fastapi import WebSocket
 
+import asyncio
 
 HAND_CONNECTIONS = mp.solutions.hands.HAND_CONNECTIONS
 
@@ -92,6 +93,8 @@ class VisionInstance:
         with open(data_path, 'r') as file:
             self.test_data = json.load(file, object_hook=lambda d: SimpleNamespace(**d))
 
+        self.step_task: asyncio.Task = None
+
     async def set_source_image(self, source_image: np.ndarray, image_path):
         self.source_image = source_image
         self.source_debug_image = source_image.copy()
@@ -100,9 +103,22 @@ class VisionInstance:
 
         await self.speech_service.finalize_start_touching_touchscreen()
 
-        return True
+        await self.websocket.send_json({
+            "type": "source_image_set",
+            "data": True
+        })
 
-    def step(self, input_image: np.ndarray):
+    async def step(self, input_data):
+        source_image = input_data.get("image", None)
+        if not source_image:
+            raise ValueError("Source image is required")
+        
+        # Decode base64 image
+        source_image_bytes = base64.b64decode(source_image)
+
+        input_image_orig = cv2.imdecode(np.frombuffer(source_image_bytes, np.uint8), cv2.IMREAD_COLOR)
+        input_image = cv2.cvtColor(input_image_orig, cv2.COLOR_BGR2RGB)
+
         self.input_image = input_image
         self.input_debug_image = input_image.copy()
         self.source_debug_image = self.source_image.copy()
@@ -123,7 +139,24 @@ class VisionInstance:
 
         self.__draw_debug_info(self.input_debug_image, self.source_debug_image, homography, hands_info, input_finger_tip_location, source_finger_tip_location, text_under_finger)
 
-        return self.input_debug_image, self.source_debug_image, text_under_finger
+        # Convert np.ndarray to base64-encoded strings
+        _, input_image_encoded = cv2.imencode('.jpg', self.input_debug_image)
+        _, source_image_encoded = cv2.imencode('.jpg', self.source_debug_image)
+
+        input_image_base64 = base64.b64encode(input_image_encoded).decode('utf-8')
+        source_image_base64 = base64.b64encode(source_image_encoded).decode('utf-8')
+
+        return_data = {
+            "input_image": input_image_base64,
+            "source_image": source_image_base64,
+            "text_under_finger": text_under_finger
+        }
+
+        await self.websocket.send_json({
+            "type": "step_response",
+            "data": return_data
+        })
+
 
     def __detect_hands(self, input_image):
 

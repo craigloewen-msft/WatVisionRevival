@@ -178,8 +178,6 @@ When starting say hello and ask the user to to tell you when they are ready to s
                 if not self.is_running:
                     break
 
-                print(f"Debug: Received event of type {event_type}")
-                    
                 if event_type == "response.audio_transcript.delta":
                     await self.main_websocket.send_json({
                         "type": "response.audio_transcript.delta",

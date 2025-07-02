@@ -1,3 +1,4 @@
+import asyncio
 import os
 from azure.cognitiveservices.vision.computervision import ComputerVisionClient
 from msrest.authentication import CognitiveServicesCredentials
@@ -19,6 +20,8 @@ from openai import AzureOpenAI
 from matching_service import MatchingService
 
 from typing import Dict
+
+import time
 
 class VisionManager:
     def __init__(self):
@@ -52,6 +55,8 @@ class VisionManager:
 
         self.visionInstanceList: Dict[str, VisionInstance] = {}
 
+        self.running_step_tasks = {}
+
     def __get_cv_image_from_input(self, input_image):
         # Convert the input image to a format OpenCV can process directly
         image_bytes = input_image.read()  # Read the image bytes from the input
@@ -84,29 +89,28 @@ class VisionManager:
         return await self.visionInstanceList[session_id].set_source_image(source_image, filepath)
 
     
-    def step(self, session_id, input_image_bytes):
+    async def step(self, session_id, input_data):
         if session_id not in self.visionInstanceList:
             raise ValueError(f"Session {session_id} not found")
         
-        input_image = cv2.imdecode(np.frombuffer(input_image_bytes, np.uint8), cv2.IMREAD_COLOR)
+        if self.visionInstanceList[session_id].step_task is not None:
+            return
+        
+        async def run_step_task():
+            try:
+                start_time = time.time()
+                await self.visionInstanceList[session_id].step(input_data)
+                end_time = time.time()
+                execution_time = end_time - start_time
+                print(f"Step execution time for session {session_id}: {execution_time:.4f} seconds")
+            except Exception as e:
+                raise e
+            finally: 
+                self.visionInstanceList[session_id].step_task = None
 
-        input_image_rgb = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)
+        task = asyncio.create_task(run_step_task())
+        self.visionInstanceList[session_id].step_task = task
 
-        input_image, source_image, text_under_finger = self.visionInstanceList[session_id].step(input_image_rgb)
-
-        # Convert np.ndarray to base64-encoded strings
-        _, input_image_encoded = cv2.imencode('.jpg', input_image)
-        _, source_image_encoded = cv2.imencode('.jpg', source_image)
-
-        input_image_base64 = base64.b64encode(input_image_encoded).decode('utf-8')
-        source_image_base64 = base64.b64encode(source_image_encoded).decode('utf-8')
-
-        # Return as JSON-serializable dictionary
-        return {
-            "input_image": input_image_base64,
-            "source_image": source_image_base64,
-            "text_under_finger": text_under_finger
-        }
     
     def get_current_image_description(self, session_id):
         if session_id not in self.visionInstanceList:

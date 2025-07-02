@@ -288,7 +288,7 @@ function DebugVideo() {
                     <h3>Input Video</h3>
                     <video
                         ref={videoRef}
-                        src="/input.mp4"
+                        src="/input-small.mp4"
                         className="img-fluid"
                         controls
                         loop

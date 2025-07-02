@@ -18,6 +18,8 @@ class WatVision {
         this.inputImageElement = inputImageElement;
         this.debugInputImageElement = debugInputImageElement;
         this.debugReferenceImageElement = debugReferenceImageElement;
+
+        this.waitingForStepReply = false;
     }
 
     async captureSourceImage() {
@@ -45,6 +47,13 @@ class WatVision {
 
     async step() {
         if (this.trackingScreen) {
+
+            if (this.waitingForStepReply) {
+                return null;
+            }
+
+            this.waitingForStepReply = true;
+
             let imgBlob = await this.getImageBlob(this.inputImageElement);
 
             const base64Image = await this.blobToBase64(imgBlob);
@@ -63,6 +72,9 @@ class WatVision {
 
     handleStepResponse(data) {
         console.log("Handling step response:", data);
+
+        this.waitingForStepReply = false;
+
         let inputImageData = data.data.input_image;
         let sourceImageData = data.data.source_image;
         let textUnderFinger = data.data.text_under_finger;
@@ -136,6 +148,7 @@ class WatVision {
         this.sourceImageCaptured = false;
         this.audioTranscriptText = "";
         this.lastReadText = null;
+        this.waitingForStepReply = false;
         this.stopTrackingScreen();
         this.speechClient.stopRecording();
     }
