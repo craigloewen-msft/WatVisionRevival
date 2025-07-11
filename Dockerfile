@@ -28,7 +28,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project --no-dev
-COPY . /app
+COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
 
@@ -42,7 +42,7 @@ COPY --from=builder /python /python
 
 # Copy the application from the builder
 COPY --from=builder /app/.venv /app/.venv
-COPY --from=builder /app/backend /app/backend
+COPY backend /app/backend
 
 # Copy built frontend into the backend's static directory (adjust path as needed)
 COPY --from=frontend-builder /frontend/build /app/backend/dist
