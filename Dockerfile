@@ -1,6 +1,9 @@
 # Stage 1: Build the frontend
 FROM node:20-slim AS frontend-builder
 
+ARG REACT_APP_WEBSOCKET_HOST
+ENV REACT_APP_WEBSOCKET_HOST=$REACT_APP_WEBSOCKET_HOST
+
 WORKDIR /frontend
 
 # Copy only the frontend folder
