@@ -360,7 +360,7 @@ class WatVision {
 
     getWebSocketUrl() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = process.env.NODE_ENV === 'development' ? window.location.hostname : process.env.REACT_APP_WEBSOCKET_HOST;
+        const host = process.env.NODE_ENV === 'development' ? window.location.hostname : (process.env.REACT_APP_WEBSOCKET_HOST || "notset");
         const port = process.env.NODE_ENV === 'development' ? ':8000' : '';
         return `${protocol}//${host}${port}/ws`;
     }
