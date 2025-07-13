@@ -4,6 +4,8 @@ FROM node:20-slim AS frontend-builder
 ARG REACT_APP_WEBSOCKET_HOST
 ENV REACT_APP_WEBSOCKET_HOST=$REACT_APP_WEBSOCKET_HOST
 
+RUN echo "Using WebSocket host: $REACT_APP_WEBSOCKET_HOST"
+
 WORKDIR /frontend
 
 # Copy only the frontend folder
