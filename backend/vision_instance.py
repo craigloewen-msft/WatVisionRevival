@@ -94,12 +94,23 @@ class VisionInstance:
             self.test_data = json.load(file, object_hook=lambda d: SimpleNamespace(**d))
 
         self.step_task: asyncio.Task = None
+        
+        # Homography stabilization
+        self.homography_buffer = []
+        self.stable_homography = None
+        self.homography_buffer_size = 5
+        self.min_match_confidence = 0.15  # Minimum inlier ratio (25% of matches must be inliers)
+        self.smoothing_factor = 0.2  # Higher = more smoothing
 
     async def set_source_image(self, source_image: np.ndarray, image_path):
         self.source_image = source_image
         self.source_debug_image = source_image.copy()
 
         self.text_info = self.__get_text_info(image_path)
+        
+        # Reset homography stabilization for new source image
+        self.homography_buffer = []
+        self.stable_homography = None
 
         await self.speech_service.finalize_start_touching_touchscreen()
 
@@ -316,100 +327,80 @@ class VisionInstance:
         return input_debug_image, source_debug_image
     
     def __get_homography(self, input_image, source_image):
-        # Default to use xfeat for homography
-        return self.__get_homography_xfeat(input_image, source_image)
-    
-    def __get_homography_orb(self, input_image, source_image):
-        # Create ORB detector
-        orb = cv2.ORB_create(nfeatures=2000)
+        # Get the raw homography and its confidence
+        raw_homography, confidence = self.__get_homography_xfeat(input_image, source_image)
         
-        # Detect keypoints and compute descriptors
-        kp1, des1 = orb.detectAndCompute(source_image, None)
-        kp2, des2 = orb.detectAndCompute(input_image, None)
-        
-        # Create matcher
-        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-        
-        # Match descriptors
-        matches = bf.match(des1, des2)
-        
-        # Sort matches by distance
-        matches = sorted(matches, key=lambda x: x.distance)
-        
-        # Use top matches (adjust as needed)
-        good_matches = matches[:100]
-        
-        # Extract location of good matches
-        src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-        dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-        
-        # Calculate Homography
-        H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-        
-        # Draw matches for debug visualization
-        match_img = cv2.drawMatches(source_image, kp1, input_image, kp2, good_matches, None, 
-                                    flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        
-        # Save the concatenated image with matches
-        concatenated_image_path = os.path.join(os.getcwd(), 'concatenated_image_with_matches.jpg')
-        cv2.imwrite(concatenated_image_path, match_img)
-        
-        return H
-    
-    def __get_homography_sift(self, input_image, source_image):
-        # Create SIFT detector
-        sift = cv2.SIFT_create()
-        
-        # Detect keypoints and compute descriptors
-        kp1, des1 = sift.detectAndCompute(source_image, None)
-        kp2, des2 = sift.detectAndCompute(input_image, None)
-        
-        # FLANN parameters
-        FLANN_INDEX_KDTREE = 1
-        index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-        search_params = dict(checks=50)
-        
-        # Create FLANN matcher
-        flann = cv2.FlannBasedMatcher(index_params, search_params)
-        
-        # Match descriptors
-        matches = flann.knnMatch(des1, des2, k=2)
-        
-        # Apply ratio test
-        good_matches = []
-        for m, n in matches:
-            if m.distance < 0.7 * n.distance:
-                good_matches.append(m)
-        
-        # Extract location of good matches
-        if len(good_matches) > 10:
-            src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-            dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-            
-            # Calculate Homography
-            H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-            
-            # Draw matches for debug visualization
-            match_mask = mask.ravel().tolist()
-            draw_params = dict(matchColor=(0, 255, 0),
-                               singlePointColor=None,
-                               matchesMask=match_mask,
-                               flags=2)
-            
-            match_img = cv2.drawMatches(source_image, kp1, input_image, kp2, good_matches, None, **draw_params)
-            
-            # Save the concatenated image with matches
-            concatenated_image_path = os.path.join(os.getcwd(), 'concatenated_image_with_matches.jpg')
-            cv2.imwrite(concatenated_image_path, match_img)
-            
-            return H
-        else:
-            print("Not enough good matches found for SIFT homography")
-            return None
-    
+        # Apply temporal stabilization
+        return self.__stabilize_homography(raw_homography, confidence)
+
     def __get_homography_xfeat(self, input_image, source_image):
-        # Resize images to smaller size for faster processing
-        return self.matching_service.get_homography_xfeat(input_image, source_image)
+        """
+        Get homography with confidence metric from XFeat matching.
+        Returns (homography_matrix, confidence_score)
+        """
+        # Use the matching service's new method that returns both homography and inlier ratio
+        homography, confidence = self.matching_service.get_homography_xfeat(input_image, source_image)
+        
+        return homography, confidence
+    
+    def __stabilize_homography(self, new_homography, confidence):
+        """
+        Apply temporal smoothing to reduce homography jitter.
+        """
+        if new_homography is None:
+            return self.stable_homography if self.stable_homography is not None else np.eye(3)
+        
+        # If confidence is too low, don't update
+        if confidence < self.min_match_confidence:
+            if self.stable_homography is not None:
+                return self.stable_homography
+            else:
+                # First frame or no stable homography yet
+                self.stable_homography = new_homography.copy()
+                return new_homography
+        
+        # Add to buffer
+        self.homography_buffer.append({
+            'matrix': new_homography.copy(),
+            'confidence': confidence
+        })
+        
+        # Keep buffer size manageable
+        if len(self.homography_buffer) > self.homography_buffer_size:
+            self.homography_buffer.pop(0)
+        
+        # Calculate weighted average of recent homographies
+        if self.stable_homography is None:
+            # First good homography
+            self.stable_homography = new_homography.copy()
+            return new_homography
+        
+        # Exponential moving average with confidence weighting
+        smoothed_homography = self.__calculate_smoothed_homography()
+        
+        self.stable_homography = smoothed_homography
+        return smoothed_homography
+    
+    def __calculate_smoothed_homography(self):
+        """
+        Calculate a confidence-weighted smoothed homography from the buffer.
+        """
+        if not self.homography_buffer:
+            return self.stable_homography
+        
+        # Get the most recent homography
+        latest = self.homography_buffer[-1]
+        
+        # Simple exponential moving average
+        alpha = 1.0 - self.smoothing_factor  # Lower alpha = more smoothing
+        
+        # Weight alpha by confidence
+        weighted_alpha = alpha * latest['confidence']
+        
+        # Smooth the homography matrix element-wise
+        smoothed = (1.0 - weighted_alpha) * self.stable_homography + weighted_alpha * latest['matrix']
+        
+        return smoothed
     
     def __get_text_info(self, input_image_path):
         # try: 

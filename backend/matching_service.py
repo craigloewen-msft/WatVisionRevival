@@ -40,11 +40,34 @@ class MatchingService:
         self.xfeat = torch.hub.load('verlab/accelerated_features', 'XFeat', pretrained = True, top_k = 4096)
 
     def get_homography_xfeat(self, input_image, source_image):
-        # Resize images to smaller size for faster processing
-        resize_factor = 0.4  # Reduce to 40% of original size
-        input_image_resized = cv2.resize(input_image, None, fx=resize_factor, fy=resize_factor)
-        source_image_resized = cv2.resize(source_image, None, fx=resize_factor, fy=resize_factor)
+        """
+        Get homography with confidence metric based on inlier ratio.
+        Returns (homography_matrix, confidence_score)
+        """
+        # Only resize if either dimension is larger than max_dimension pixels
+        max_dimension = 600
         
+        # Check input image dimensions
+        input_h, input_w = input_image.shape[:2]
+        input_max_dim = max(input_h, input_w)
+        input_resize_factor = min(1.0, max_dimension / input_max_dim) if input_max_dim > max_dimension else 1.0
+        
+        # Check source image dimensions  
+        source_h, source_w = source_image.shape[:2]
+        source_max_dim = max(source_h, source_w)
+        source_resize_factor = min(1.0, max_dimension / source_max_dim) if source_max_dim > max_dimension else 1.0
+        
+        # Resize images only if needed
+        if input_resize_factor < 1.0:
+            input_image_resized = cv2.resize(input_image, None, fx=input_resize_factor, fy=input_resize_factor)
+        else:
+            input_image_resized = input_image
+            
+        if source_resize_factor < 1.0:
+            source_image_resized = cv2.resize(source_image, None, fx=source_resize_factor, fy=source_resize_factor)
+        else:
+            source_image_resized = source_image
+
         # Detect and compute on resized images with fewer features
         top_k = 2048  # Reduce from 4096 to 2048 features
         output0 = self.xfeat.detectAndCompute(source_image_resized, top_k=top_k)[0]
@@ -57,12 +80,24 @@ class MatchingService:
         # Match features
         mkpts_0, mkpts_1, other = self.xfeat.match_lighterglue(output0, output1)
         
+        if len(mkpts_0) < 4:  # Need at least 4 points for homography
+            return None, 0.0
+        
         # Scale keypoints back to original image size
-        mkpts_0 = mkpts_0 / resize_factor
-        mkpts_1 = mkpts_1 / resize_factor
+        mkpts_0 = mkpts_0 / source_resize_factor
+        mkpts_1 = mkpts_1 / input_resize_factor
 
         # Calculate homography using USAC_FAST algorithm with fewer iterations
         H, mask = cv2.findHomography(mkpts_0, mkpts_1, cv2.USAC_FAST, 3.0, maxIters=500, confidence=0.995)
+        
+        if H is None or mask is None:
+            return None, 0.0
+        
+        # Calculate inlier ratio as confidence
+        mask = mask.flatten()
+        inlier_ratio = np.sum(mask) / len(mask)
+        
+        print(f'Inlier ratio (confidence): {inlier_ratio:.3f}')
         
         # Only generate visualization in debug mode or when needed
         if os.environ.get('DEBUG_VISUALIZATION', '0') == '1':
@@ -72,4 +107,4 @@ class MatchingService:
             concatenated_image_path = os.path.join(os.getcwd(), 'concatenated_image_with_matches.jpg')
             cv2.imwrite(concatenated_image_path, canvas)
 
-        return H
+        return H, inlier_ratio
