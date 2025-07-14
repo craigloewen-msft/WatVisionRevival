@@ -132,6 +132,7 @@ class VisionInstance:
 
         self.input_image = input_image
         self.input_debug_image = input_image.copy()
+        self.source_debug_image = self.source_image.copy()
 
         hands_info = self.__detect_hands(self.input_image)
 
@@ -197,6 +198,8 @@ class VisionInstance:
             return None, None
     
     def __draw_debug_info(self, input_image, source_image, homography, hands_info, input_finger_tip_location, source_finger_tip_location, text_under_finger):
+        self.source_debug_image = source_image.copy()
+
         self.__draw_source_on_input(self.input_debug_image, self.source_debug_image, homography)
         self.__draw_hands(self.input_debug_image, self.source_debug_image, hands_info, input_finger_tip_location, source_finger_tip_location)
         self.__draw_text_data(self.input_debug_image, self.source_debug_image, self.text_info, homography, text_under_finger)
@@ -205,7 +208,8 @@ class VisionInstance:
         homography_inv = np.linalg.inv(homography)
         source_height, source_width = self.source_image.shape[:2]
         warped_input_image = cv2.warpPerspective(input_image, homography_inv, (source_width, source_height))
-        self.source_debug_image = warped_input_image.copy()
+        
+        self.source_debug_image = cv2.addWeighted(self.source_debug_image, 1, warped_input_image, 0.8, 0)
     
     def __draw_source_on_input(self, input_debug_mat, source_debug_mat, homography):
         # Get the dimensions of the source debug matrix
