@@ -12,7 +12,6 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
     const [watVision, setWatVision] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [trackingScreen, setTrackingScreen] = useState(false);
     const [sourceImageCaptured, setSourceImageCaptured] = useState(false);
 
     // Speech recognition states
@@ -24,6 +23,7 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
     // Screen info states
     const [screenDescription, setScreenDescription] = useState(null);
     const [textElements, setTextElements] = useState(null);
+    const [trackedElementIndex, setTrackedElementIndex] = useState(null);
 
     // Initialize WatVision after refs are available
     useEffect(() => {
@@ -68,10 +68,10 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
             // Set up unified callback for all displayed value updates
             watVisionInstance.setOnDisplayedValueUpdates((instance) => {
                 setInterimText(instance.audioTranscriptText);
-                setTrackingScreen(instance.trackingScreen);
                 setScreenDescription(instance.last_received_screen_description);
                 setTextElements(instance.last_received_text_elements);
                 setSourceImageCaptured(instance.sourceImageCaptured);
+                setTrackedElementIndex(instance.trackedElementIndex);
             });
 
             watVisionInstance.connect();
@@ -129,20 +129,22 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
         }
     };
 
-    // Toggle video processing on/off
-    const toggleTrackingScreen = async () => {
+    // Track a specific element by index
+    const trackElement = async (elementIndex) => {
         if (!watVision) return;
+        
+        console.log(`Tracking element at index: ${elementIndex}`);
+        await watVision.trackElement(elementIndex);
+        await watVision.startTrackingScreen();
+    };
 
-        if (!trackingScreen) {
-            const result = await watVision.startTrackingScreen();
-            if (!result) {
-                // Failed to start tracking because no source image
-                console.log("Cannot start tracking - capture a source image first");
-                return;
-            }
-        } else {
-            watVision.stopTrackingScreen();
-        }
+    // Stop tracking the current element
+    const stopTrackingElement = async () => {
+        if (!watVision) return;
+        
+        console.log('Stopping element tracking');
+        await watVision.clearTrackedElement();
+        watVision.stopTrackingScreen();
     };
 
     return {
@@ -151,7 +153,6 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
         setLoading,
         error,
         setError,
-        trackingScreen,
         sourceImageCaptured,
         isRecording,
         interimText,
@@ -159,9 +160,11 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
         sessionId,
         screenDescription,
         textElements,
+        trackedElementIndex,
         toggleSpeechRecognition,
         explainScreen,
         captureScreen,
-        toggleTrackingScreen,
+        trackElement,
+        stopTrackingElement,
     };
 }

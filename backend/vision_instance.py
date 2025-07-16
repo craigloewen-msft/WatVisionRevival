@@ -102,7 +102,11 @@ class VisionInstance:
         self.min_match_confidence = 0.15  # Minimum inlier ratio (25% of matches must be inliers)
         self.smoothing_factor = 0.2  # Higher = more smoothing
 
+        self.tracked_element_index = None
+
     async def set_source_image(self, source_image: np.ndarray, image_path):
+        self.tracked_element_index = None
+
         self.source_image = source_image
         self.source_debug_image = source_image.copy()
 
@@ -142,11 +146,18 @@ class VisionInstance:
         
         # Store the latest source finger position and check for text under finger
         text_under_finger = None
+        distance_to_tracked_element = None
         if source_finger_tip_location:
             self.latest_source_finger_position = source_finger_tip_location
             text_under_finger = self.get_text_under_finger(source_finger_tip_location)
             if text_under_finger:
                 print(f"Text under finger: {text_under_finger['text']}")
+            
+            # Calculate distance to tracked element if one is being tracked
+            if self.tracked_element_index is not None:
+                distance_to_tracked_element = self.get_distance_to_tracked_element(source_finger_tip_location)
+                if distance_to_tracked_element is not None:
+                    print(f"Distance to tracked element: {distance_to_tracked_element:.2f} pixels")
 
         self.__draw_debug_info(self.input_debug_image, self.source_debug_image, homography, hands_info, input_finger_tip_location, source_finger_tip_location, text_under_finger)
 
@@ -160,14 +171,15 @@ class VisionInstance:
         return_data = {
             "input_image": input_image_base64,
             "source_image": source_image_base64,
-            "text_under_finger": text_under_finger
+            "text_under_finger": text_under_finger,
+            "distance_to_tracked_element": distance_to_tracked_element,
+            "tracked_element_index": self.tracked_element_index
         }
 
         await self.websocket.send_json({
             "type": "step_response",
             "data": return_data
         })
-
 
     def __detect_hands(self, input_image):
 
@@ -264,6 +276,7 @@ class VisionInstance:
             original_height = image_text_data[0].height
             
             # Draw text boxes and text on source image
+            current_index = 0
             for read_result in image_text_data:
                     for line in read_result.lines:
                             # Extract bounding box points
@@ -279,15 +292,27 @@ class VisionInstance:
                             # Scale points to source image dimensions
                             points = (original_points * np.array([source_width, source_height])).astype(np.int32).reshape(-1, 1, 2)
                             
+                            # Choose color and thickness based on whether this is the tracked element
+                            if self.tracked_element_index is not None and current_index == self.tracked_element_index:
+                                # Tracked element - use bright magenta/purple and thicker line
+                                color = (255, 0, 255)  # Magenta
+                                thickness = 4
+                                text_color = (255, 0, 255)
+                            else:
+                                # Regular element - use red
+                                color = (0, 0, 255)  # Red
+                                thickness = 2
+                                text_color = (0, 0, 255)
+                            
                             # Draw polygon on source image
-                            cv2.polylines(source_debug_image, [points], isClosed=True, color=(0, 0, 255), thickness=2)
+                            cv2.polylines(source_debug_image, [points], isClosed=True, color=color, thickness=thickness)
                             
                             # Draw text
                             text = line.text
                             # Get top-left corner of bounding box for text placement
                             text_position = (int(bbox[0]), int(bbox[1]) - 10)
                             cv2.putText(source_debug_image, text, text_position, 
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
                             
                             # Transform the bounding box to input image coordinates using homography
                             points_float = points.astype(np.float32).reshape(-1, 1, 2)
@@ -295,14 +320,16 @@ class VisionInstance:
                             transformed_points = transformed_points.astype(np.int32)
                             
                             # Draw transformed polygon on input image
-                            cv2.polylines(input_debug_image, [transformed_points], isClosed=True, color=(0, 0, 255), thickness=2)
+                            cv2.polylines(input_debug_image, [transformed_points], isClosed=True, color=color, thickness=thickness)
                             
                             # Draw transformed text
                             text = line.text
                             # Get top-left corner of transformed bounding box for text placement
                             transformed_text_position = (transformed_points[0][0][0], transformed_points[0][0][1] - 10)
                             cv2.putText(input_debug_image, text, transformed_text_position, 
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+                            
+                            current_index += 1
         
         # Draw text under finger if available
         if text_under_finger:
@@ -488,6 +515,52 @@ class VisionInstance:
         
         # No text found under finger
         return None
+
+    def get_distance_to_tracked_element(self, finger_position):
+        """
+        Calculate the distance from fingertip to the tracked element.
+        
+        Args:
+            finger_position (dict): Contains 'x' and 'y' coordinates of the fingertip in the source image space.
+        
+        Returns:
+            float: Distance in pixels from fingertip to tracked element, or None if no tracked element or finger.
+        """
+        if not self.text_info or not finger_position or self.tracked_element_index is None or len(self.text_info) == 0:
+            return None
+            
+        x, y = finger_position['x'], finger_position['y']
+        
+        # Get image dimensions
+        original_width = self.text_info[0].width
+        original_height = self.text_info[0].height
+        
+        # Current image dimensions
+        source_height, source_width = self.source_image.shape[:2]
+        
+        # Find the tracked element by index
+        line = self.text_info[0].lines[self.tracked_element_index]
+        # This is our tracked element
+        bbox = line.bounding_box
+        
+        # Convert bounding box format from [x1,y1,x2,y2,x3,y3,x4,y4] to points
+        original_points = np.array([
+            [bbox[0] / original_width, bbox[1] / original_height],
+            [bbox[2] / original_width, bbox[3] / original_height],
+            [bbox[4] / original_width, bbox[5] / original_height],
+            [bbox[6] / original_width, bbox[7] / original_height]
+        ], dtype=np.float32)
+        
+        # Scale points to current image dimensions
+        points = (original_points * np.array([source_width, source_height])).astype(np.int32)
+
+        # For more accurate distance, calculate distance to closest edge
+        # Use pointPolygonTest with measureDist=True to get signed distance
+        signed_distance = cv2.pointPolygonTest(points, (x, y), True)
+        
+        # If positive, point is inside (should be 0, but just in case)
+        # If negative, it's the distance to the closest edge
+        return abs(signed_distance)
     
     def get_current_image_description(self):
         # Check if source image is set
@@ -618,3 +691,27 @@ You will keep your answers short and sweet. You will be shown an image of a touc
         Processes an audio chunk for speech recognition.
         """
         return await self.speech_service.process_audio_chunk(audio_chunk)
+
+    async def track_element(self, element_index):
+        """
+        Tracks a specific element by its index.
+        
+        Args:
+            element_index (int): The index of the element to track.
+        """
+        if not self.text_info or len(self.text_info) == 0 or len(self.text_info[0].lines) < element_index:
+            raise ValueError("No text information available to track elements.")
+        
+        self.tracked_element_index = element_index
+        
+        print(f"Now tracking element {element_index}: '{self.text_info[0].lines[element_index].text}'")
+
+    async def clear_tracked_element(self):
+        """
+        Clears the currently tracked element.
+        """
+        if self.tracked_element_index is not None:
+            print(f"Clearing tracking of element {self.tracked_element_index}")
+            self.tracked_element_index = None
+        else:
+            print("No element is currently being tracked.")

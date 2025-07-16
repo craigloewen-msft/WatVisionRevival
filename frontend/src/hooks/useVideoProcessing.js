@@ -7,7 +7,6 @@ import { useEffect, useRef } from "react";
  * @param {boolean} params.videoLoaded - Whether video metadata is loaded
  * @param {React.RefObject} params.videoRef - Video element ref
  * @param {React.RefObject} params.videoCanvas - Canvas element ref
- * @param {boolean} params.trackingScreen - Whether screen tracking is active
  * @param {Function} params.setLoading - Function to set loading state
  * @param {Function} params.setError - Function to set error state
  */
@@ -16,7 +15,6 @@ export function useVideoProcessing({
     videoLoaded, 
     videoRef, 
     videoCanvas, 
-    trackingScreen, 
     setLoading, 
     setError 
 }) {
@@ -76,5 +74,5 @@ export function useVideoProcessing({
         return () => {
             cancelAnimationFrame(animationFrameId);
         };
-    }, [watVision, videoLoaded, trackingScreen, videoRef, videoCanvas, setLoading, setError]);
+    }, [watVision, videoLoaded, videoRef, videoCanvas, setLoading, setError]);
 }

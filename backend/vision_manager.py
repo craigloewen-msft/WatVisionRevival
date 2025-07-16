@@ -160,3 +160,15 @@ class VisionManager:
             raise ValueError(f"Session {session_id} not found")
 
         return await self.visionInstanceList[session_id].process_audio_chunk(audio_data)
+    
+    async def track_element(self, session_id, element_index):
+        if session_id not in self.visionInstanceList:
+            raise ValueError(f"Session {session_id} not found")
+
+        return await self.visionInstanceList[session_id].track_element(element_index)
+
+    async def clear_tracked_element(self, session_id):
+        if session_id not in self.visionInstanceList:
+            raise ValueError(f"Session {session_id} not found")
+
+        return await self.visionInstanceList[session_id].clear_tracked_element()

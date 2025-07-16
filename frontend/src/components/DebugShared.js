@@ -11,14 +11,15 @@ function DebugControls({
     speechError,
     interimText,
     sessionId,
-    trackingScreen,
     screenDescription,
     textElements,
     sourceImageCaptured,
+    trackedElementIndex,
     toggleSpeechRecognition,
-    toggleTrackingScreen,
     explainScreen,
     captureScreen,
+    trackElement,
+    stopTrackingElement,
 }) {
     return (
         <>
@@ -82,13 +83,6 @@ function DebugControls({
                             <i className="fas fa-camera"></i> Capture Screen
                         </button>
                         <button
-                            className={`btn ${trackingScreen ? 'btn-danger' : 'btn-success'}`}
-                            onClick={toggleTrackingScreen}
-                            disabled={!watVision || !sourceImageCaptured}>
-                            <i className={`fas ${trackingScreen ? 'fa-stop' : 'fa-play'}`}></i>
-                            {trackingScreen ? ' Stop Tracking' : ' Start Tracking'}
-                        </button>
-                        <button
                             className="btn btn-info"
                             onClick={explainScreen}
                             disabled={!watVision}>
@@ -133,10 +127,11 @@ function DebugControls({
                                                     <th>ID</th>
                                                     <th>Text</th>
                                                     <th>Position</th>
+                                                    <th>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {textElements.map(element => (
+                                                {textElements.map((element, index) => (
                                                     <tr key={element.id}>
                                                         <td>{element.id}</td>
                                                         <td><strong>{element.text}</strong></td>
@@ -163,6 +158,29 @@ function DebugControls({
                                                                 }} title={`(${element.position_in_bounded_text_area.norm_x.toFixed(3)}, ${element.position_in_bounded_text_area.norm_y.toFixed(3)})`}>
                                                                 </div>
                                                             </div>
+                                                        </td>
+                                                        <td>
+                                                            {trackedElementIndex === index ? (
+                                                                // Currently tracking this element - show stop button
+                                                                <button
+                                                                    className="btn btn-sm btn-danger"
+                                                                    onClick={stopTrackingElement}
+                                                                    disabled={!watVision}
+                                                                    title={`Stop tracking: ${element.text}`}>
+                                                                    <i className="fas fa-stop"></i> Stop Tracking
+                                                                </button>
+                                                            ) : (
+                                                                // Not tracking this element - show track button
+                                                                <button
+                                                                    className="btn btn-sm btn-primary"
+                                                                    onClick={() => trackElement(index)}
+                                                                    disabled={!watVision || !sourceImageCaptured || trackedElementIndex !== null}
+                                                                    title={trackedElementIndex !== null ? 
+                                                                        `Stop tracking current element first` : 
+                                                                        `Track element: ${element.text}`}>
+                                                                    <i className="fas fa-crosshairs"></i> Track
+                                                                </button>
+                                                            )}
                                                         </td>
                                                     </tr>
                                                 ))}

@@ -18,7 +18,6 @@ function DebugVideo() {
         setLoading,
         error,
         setError,
-        trackingScreen,
         sourceImageCaptured,
         isRecording,
         interimText,
@@ -26,10 +25,12 @@ function DebugVideo() {
         sessionId,
         screenDescription,
         textElements,
+        trackedElementIndex,
         toggleSpeechRecognition,
         explainScreen,
         captureScreen,
-        toggleTrackingScreen,
+        trackElement,
+        stopTrackingElement,
     } = useWatVision({
         videoCanvas,
         debugInputImageRef,
@@ -42,7 +43,6 @@ function DebugVideo() {
         videoLoaded,
         videoRef,
         videoCanvas,
-        trackingScreen,
         setLoading,
         setError
     });
@@ -76,14 +76,15 @@ function DebugVideo() {
                 speechError={speechError}
                 interimText={interimText}
                 sessionId={sessionId}
-                trackingScreen={trackingScreen}
                 sourceImageCaptured={sourceImageCaptured}
                 screenDescription={screenDescription}
                 textElements={textElements}
+                trackedElementIndex={trackedElementIndex}
                 toggleSpeechRecognition={toggleSpeechRecognition}
-                toggleTrackingScreen={toggleTrackingScreen}
                 explainScreen={explainScreen}
                 captureScreen={captureScreen}
+                trackElement={trackElement}
+                stopTrackingElement={stopTrackingElement}
             />
             
             <div className="row">

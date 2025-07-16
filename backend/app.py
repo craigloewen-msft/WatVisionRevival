@@ -187,7 +187,19 @@ async def handle_websocket_message(session_id: str, data: dict, websocket: WebSo
                 "type": "screen_info_response",
                 "data": screen_info
             })
+
+        elif message_type == "track_element":
+            element_index = data.get("element_index")
+            if element_index is None:
+                raise ValueError("Element index is required for tracking")
             
+            print(f'Tracking element at index {element_index} for session {session_id}')
+            await vision_manager.track_element(session_id, element_index)
+            
+        elif message_type == "clear_tracked_element":
+            print(f'Clearing element tracking for session {session_id}')
+            await vision_manager.clear_tracked_element(session_id)
+
         else:
             print(f'Unhandled message type {message_type} for session {session_id}')
             

@@ -13,7 +13,7 @@ class WatVision {
         this.sessionId = null;
 
         this.trackingScreen = false;
-        this.externalTrackingScreen = null;
+        this.trackedElementIndex = null;
 
         this.inputImageElement = inputImageElement;
         this.debugInputImageElement = debugInputImageElement;
@@ -149,6 +149,24 @@ class WatVision {
         });
     }
 
+    async trackElement(elementIndex) {
+        // Send a WebSocket message to track a specific element
+        this.sendWebSocketMessage('track_element', {
+            element_index: elementIndex,
+            session_id: this.getSessionId()
+        });
+        this.trackedElementIndex = elementIndex;
+        console.log(`Sent track_element message for index: ${elementIndex}`);
+    }
+
+    async clearTrackedElement() {
+        this.sendWebSocketMessage('clear_tracked_element', {
+            session_id: this.getSessionId()
+        });
+        this.trackedElementIndex = null;
+        console.log("Sent clear_tracked_element message");
+    }
+
     getSessionId() {
         return this.sessionId;
     }
@@ -244,11 +262,11 @@ class WatVision {
                 break;
 
             case 'start_tracking_touchscreen':
-                this.startTrackingScreen?.();
+                this.startTrackingScreen();
                 break;
 
             case 'stop_tracking_touchscreen':
-                this.stopTrackingScreen?.();
+                this.stopTrackingScreen();
                 break;
 
             case 'source_image_set':
@@ -310,7 +328,6 @@ class WatVision {
     stopTrackingScreen() {
         this.trackingScreen = false;
         this.onDisplayedValueUpdates?.(this);
-        this.sourceImageCaptured = false;
     }
 
     // Callback events
