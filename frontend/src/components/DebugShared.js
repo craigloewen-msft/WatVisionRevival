@@ -14,10 +14,11 @@ function DebugControls({
     trackingScreen,
     screenDescription,
     textElements,
+    sourceImageCaptured,
     toggleSpeechRecognition,
     toggleTrackingScreen,
     explainScreen,
-    requestStartTrackingTouchScreen
+    captureScreen,
 }) {
     return (
         <>
@@ -63,7 +64,7 @@ function DebugControls({
                                 </div>
                             )}
                             <small className="text-muted d-block mt-2">
-                                Voice commands: "capture source", "start processing", "stop processing", "explain screen"
+                                Voice commands: "capture screen", "start tracking", "stop tracking", "explain screen"
                             </small>
                         </div>
                     </div>
@@ -73,30 +74,32 @@ function DebugControls({
             {/* Control Buttons */}
             <div className="row mb-3">
                 <div className="col-12">
-                    <button
-                        className={`btn ${trackingScreen ? 'btn-danger' : 'btn-success'} ml-2`}
-                        onClick={toggleTrackingScreen}
-                        disabled={!watVision}>
-                        {trackingScreen ? 'Stop Tracking screen' : 'Start Tracking screen'}
-                    </button>
-                    <button
-                        className="btn btn-info ml-2"
-                        onClick={explainScreen}
-                        disabled={!watVision}>
-                        Explain screen
-                    </button>
-                </div>
-            </div>
-
-            {/* Debug Controls */}
-            <div className="row mb-3">
-                <div className="col-12">
-                    <button
-                        className="btn btn-info ml-2"
-                        onClick={requestStartTrackingTouchScreen}
-                        disabled={!watVision}>
-                        Debug: Request start tracking touch screen
-                    </button>
+                    <div className="d-flex flex-wrap gap-2 justify-content-center">
+                        <button
+                            className="btn btn-primary"
+                            onClick={captureScreen}
+                            disabled={!watVision}>
+                            <i className="fas fa-camera"></i> Capture Screen
+                        </button>
+                        <button
+                            className={`btn ${trackingScreen ? 'btn-danger' : 'btn-success'}`}
+                            onClick={toggleTrackingScreen}
+                            disabled={!watVision || !sourceImageCaptured}>
+                            <i className={`fas ${trackingScreen ? 'fa-stop' : 'fa-play'}`}></i>
+                            {trackingScreen ? ' Stop Tracking' : ' Start Tracking'}
+                        </button>
+                        <button
+                            className="btn btn-info"
+                            onClick={explainScreen}
+                            disabled={!watVision}>
+                            <i className="fas fa-question-circle"></i> Explain Screen
+                        </button>
+                    </div>
+                    {!sourceImageCaptured && (
+                        <small className="text-muted d-block mt-2 text-center">
+                            <i className="fas fa-info-circle"></i> Capture a screen image first before starting tracking
+                        </small>
+                    )}
                 </div>
             </div>
 

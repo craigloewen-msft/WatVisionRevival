@@ -19,6 +19,7 @@ function DebugVideo() {
         error,
         setError,
         trackingScreen,
+        sourceImageCaptured,
         isRecording,
         interimText,
         speechError,
@@ -27,8 +28,8 @@ function DebugVideo() {
         textElements,
         toggleSpeechRecognition,
         explainScreen,
+        captureScreen,
         toggleTrackingScreen,
-        requestStartTrackingTouchScreen
     } = useWatVision({
         videoCanvas,
         debugInputImageRef,
@@ -76,12 +77,13 @@ function DebugVideo() {
                 interimText={interimText}
                 sessionId={sessionId}
                 trackingScreen={trackingScreen}
+                sourceImageCaptured={sourceImageCaptured}
                 screenDescription={screenDescription}
                 textElements={textElements}
                 toggleSpeechRecognition={toggleSpeechRecognition}
                 toggleTrackingScreen={toggleTrackingScreen}
                 explainScreen={explainScreen}
-                requestStartTrackingTouchScreen={requestStartTrackingTouchScreen}
+                captureScreen={captureScreen}
             />
             
             <div className="row">

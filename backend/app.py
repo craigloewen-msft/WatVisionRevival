@@ -166,12 +166,6 @@ async def handle_websocket_message(session_id: str, data: dict, websocket: WebSo
                 audio_data = base64.b64decode(audio_data)
             await vision_manager.process_audio_chunk(session_id, audio_data)
             
-        elif message_type == "debug_request_start_tracking_touchscreen":
-            print(f'Starting touchscreen tracking for session {session_id}')
-            await websocket.send_json({
-                "type": "start_tracking_touchscreen"
-            })
-
         elif message_type == "step":
             await vision_manager.step(session_id, data)
 
@@ -183,6 +177,7 @@ async def handle_websocket_message(session_id: str, data: dict, websocket: WebSo
             # Decode base64 image
             source_image_bytes = base64.b64decode(source_image)
             
+            print(f'Setting source image for session {session_id}')
             await vision_manager.set_source_image(session_id, source_image_bytes)
             
         elif message_type == "request_screen_info":

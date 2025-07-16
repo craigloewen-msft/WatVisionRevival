@@ -13,6 +13,7 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [trackingScreen, setTrackingScreen] = useState(false);
+    const [sourceImageCaptured, setSourceImageCaptured] = useState(false);
 
     // Speech recognition states
     const [isRecording, setIsRecording] = useState(false);
@@ -70,6 +71,7 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
                 setTrackingScreen(instance.trackingScreen);
                 setScreenDescription(instance.last_received_screen_description);
                 setTextElements(instance.last_received_text_elements);
+                setSourceImageCaptured(instance.sourceImageCaptured);
             });
 
             watVisionInstance.connect();
@@ -117,22 +119,30 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
         await watVision.explainScreen();
     };
 
-    // Toggle video processing on/off
-    const toggleTrackingScreen = () => {
+    const captureScreen = async () => {
         if (!watVision) return;
-
-        setTrackingScreen(prev => !prev);
-        if (!trackingScreen) {
-            watVision.startTrackingScreen();
-        } else {
-            watVision.stopTrackingScreen();
+        try {
+            await watVision.captureSourceImage();
+        } catch (err) {
+            console.error("Failed to capture screen:", err);
+            setError(err);
         }
     };
 
-    const requestStartTrackingTouchScreen = () => {
+    // Toggle video processing on/off
+    const toggleTrackingScreen = async () => {
         if (!watVision) return;
-        console.log("Requesting start tracking touch screen...");
-        watVision.sendWebSocketMessage('debug_request_start_tracking_touchscreen');
+
+        if (!trackingScreen) {
+            const result = await watVision.startTrackingScreen();
+            if (!result) {
+                // Failed to start tracking because no source image
+                console.log("Cannot start tracking - capture a source image first");
+                return;
+            }
+        } else {
+            watVision.stopTrackingScreen();
+        }
     };
 
     return {
@@ -142,6 +152,7 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
         error,
         setError,
         trackingScreen,
+        sourceImageCaptured,
         isRecording,
         interimText,
         speechError,
@@ -150,7 +161,7 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
         textElements,
         toggleSpeechRecognition,
         explainScreen,
+        captureScreen,
         toggleTrackingScreen,
-        requestStartTrackingTouchScreen
     };
 }

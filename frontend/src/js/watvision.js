@@ -251,14 +251,10 @@ class WatVision {
                 this.stopTrackingScreen?.();
                 break;
 
-            case 'source_image_captured':
-                console.log("Source image captured successfully");
-                this.sourceImageCaptured = true;
-                break;
-
             case 'source_image_set':
                 console.log("Source image set successfully");
                 this.sourceImageCaptured = true;
+                this.onDisplayedValueUpdates?.(this);
                 break;
 
             case 'step_response':
@@ -302,12 +298,13 @@ class WatVision {
 
     async startTrackingScreen() {
         if (!this.sourceImageCaptured) {
-            console.log("Capturing source image");
-            await this.captureSourceImage();
+            console.log("Cannot start tracking - no source image captured");
+            return false;
         }
 
         this.trackingScreen = true;
         this.onDisplayedValueUpdates?.(this);
+        return true;
     }
 
     stopTrackingScreen() {
