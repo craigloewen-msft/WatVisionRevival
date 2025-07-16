@@ -3,7 +3,7 @@ import React from "react";
 /**
  * Shared component for WatVision debug controls and status display
  */
-function DebugControls({ 
+function DebugControls({
     watVision,
     loading,
     error,
@@ -12,6 +12,8 @@ function DebugControls({
     interimText,
     sessionId,
     trackingScreen,
+    screenDescription,
+    textElements,
     toggleSpeechRecognition,
     toggleTrackingScreen,
     explainScreen,
@@ -95,6 +97,81 @@ function DebugControls({
                         disabled={!watVision}>
                         Debug: Request start tracking touch screen
                     </button>
+                </div>
+            </div>
+
+            {/* Screen Info Display */}
+            <div className="row mb-3">
+                <div className="col-12">
+                    <div className="card">
+                        <div className="card-body">
+                            <h5 className="card-title">Screen Information</h5>
+
+                            {/* Screen Description */}
+                            <div className="mb-3">
+                                <h6>Description:</h6>
+                                {screenDescription ? (
+                                    <div className="alert alert-info">
+                                        <small>{screenDescription}</small>
+                                    </div>
+                                ) : (
+                                    <p className="text-muted">No screen description available. Click "Explain screen" to get one.</p>
+                                )}
+                            </div>
+
+                            {/* Text Elements */}
+                            <div className="mb-3">
+                                <h6>Text Elements:</h6>
+                                {textElements && textElements.length > 0 ? (
+                                    <div className="table-responsive">
+                                        <table className="table table-sm table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>Text</th>
+                                                    <th>Position</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {textElements.map(element => (
+                                                    <tr key={element.id}>
+                                                        <td>{element.id}</td>
+                                                        <td><strong>{element.text}</strong></td>
+                                                        <td style={{ textAlign: 'center' }}>
+                                                            <div style={{
+                                                                position: 'relative',
+                                                                width: '30px',
+                                                                height: '30px',
+                                                                border: '2px solid #ccc',
+                                                                backgroundColor: '#f8f9fa',
+                                                                borderRadius: '4px',
+                                                                margin: '0 auto'
+                                                            }}>
+                                                                <div style={{
+                                                                    position: 'absolute',
+                                                                    left: `${element.position_in_bounded_text_area.norm_x * 100}%`,
+                                                                    top: `${element.position_in_bounded_text_area.norm_y * 100}%`,
+                                                                    width: '6px',
+                                                                    height: '6px',
+                                                                    backgroundColor: '#007bff',
+                                                                    borderRadius: '1px',
+                                                                    transform: 'translate(-50%, -50%)',
+                                                                    border: '1px solid #fff'
+                                                                }} title={`(${element.position_in_bounded_text_area.norm_x.toFixed(3)}, ${element.position_in_bounded_text_area.norm_y.toFixed(3)})`}>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <p className="text-muted">No text elements detected. Click "Explain screen" to analyze text.</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </>

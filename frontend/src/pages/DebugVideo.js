@@ -23,6 +23,8 @@ function DebugVideo() {
         interimText,
         speechError,
         sessionId,
+        screenDescription,
+        textElements,
         toggleSpeechRecognition,
         explainScreen,
         toggleTrackingScreen,
@@ -74,6 +76,8 @@ function DebugVideo() {
                 interimText={interimText}
                 sessionId={sessionId}
                 trackingScreen={trackingScreen}
+                screenDescription={screenDescription}
+                textElements={textElements}
                 toggleSpeechRecognition={toggleSpeechRecognition}
                 toggleTrackingScreen={toggleTrackingScreen}
                 explainScreen={explainScreen}

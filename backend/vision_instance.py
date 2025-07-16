@@ -490,6 +490,10 @@ class VisionInstance:
         return None
     
     def get_current_image_description(self):
+        # Check if source image is set
+        if self.source_image is None:
+            raise ValueError("Source image is not set. Please set a source image before requesting a description.")
+        
         response = self.llm_client.chat.completions.create(
             model=self.deployment_name,
             messages=[
@@ -503,7 +507,7 @@ You will keep your answers short and sweet. You will be shown an image of a touc
                     { 
                         "type": "image_url",
                         "image_url": {
-                            "url": np_array_image_to_data_url(self.input_image)
+                            "url": np_array_image_to_data_url(self.source_image)
                         }
                     }
                 ] } 
@@ -511,8 +515,91 @@ You will keep your answers short and sweet. You will be shown an image of a touc
             max_tokens=2000 
         )
         
-        return response.choices[0].message.content.strip()
+        ai_description = response.choices[0].message.content.strip()
+        
+        # Format text_info into a list with IDs
+        text_elements = []
+        if self.text_info:
+            text_id = 0
+            # Get image dimensions for position calculations
+            if len(self.text_info) > 0:
+                original_width = self.text_info[0].width
+                original_height = self.text_info[0].height
+                
+                # First pass: calculate the overall bounding area of all text
+                all_text_bounds = self._calculate_overall_text_bounds()
+                
+                for read_result in self.text_info:
+                    for line in read_result.lines:
+                        # Calculate position based on bounding box center
+                        bbox = line.bounding_box
+                        # Get center of bounding box (average of all corner points)
+                        center_x = (bbox[0] + bbox[2] + bbox[4] + bbox[6]) / 4
+                        center_y = (bbox[1] + bbox[3] + bbox[5] + bbox[7]) / 4
+                        
+                        # Normalize to the overall text bounding area (0-1 range within text area)
+                        if all_text_bounds:
+                            norm_x = (center_x - all_text_bounds['min_x']) / (all_text_bounds['max_x'] - all_text_bounds['min_x'])
+                            norm_y = (center_y - all_text_bounds['min_y']) / (all_text_bounds['max_y'] - all_text_bounds['min_y'])
+                        else:
+                            # Fallback to absolute positioning if bounds calculation fails
+                            norm_x = center_x / original_width
+                            norm_y = center_y / original_height
+                        
+                        text_elements.append({
+                            'id': text_id,
+                            'text': line.text,
+                            'position_in_bounded_text_area': {
+                                'norm_x': norm_x,
+                                'norm_y': norm_y
+                            }
+                        })
+                        text_id += 1
+        
+        return {
+            'description': ai_description,
+            'text_elements': text_elements
+        }
     
+    def _calculate_overall_text_bounds(self):
+        """
+        Calculate the overall bounding area that contains all detected text.
+        
+        Returns:
+            dict: Contains min_x, max_x, min_y, max_y of the overall text area, or None if no text
+        """
+        if not self.text_info:
+            return None
+            
+        min_x = float('inf')
+        max_x = float('-inf')
+        min_y = float('inf')
+        max_y = float('-inf')
+        
+        for read_result in self.text_info:
+            for line in read_result.lines:
+                bbox = line.bounding_box
+                # Get all corner points of the bounding box
+                x_coords = [bbox[0], bbox[2], bbox[4], bbox[6]]
+                y_coords = [bbox[1], bbox[3], bbox[5], bbox[7]]
+                
+                # Update overall bounds
+                min_x = min(min_x, min(x_coords))
+                max_x = max(max_x, max(x_coords))
+                min_y = min(min_y, min(y_coords))
+                max_y = max(max_y, max(y_coords))
+        
+        # Return None if no valid bounds found
+        if min_x == float('inf'):
+            return None
+            
+        return {
+            'min_x': min_x,
+            'max_x': max_x,
+            'min_y': min_y,
+            'max_y': max_y
+        }
+        
     async def start_session(self):
         """
         Starts the speech recognition service.

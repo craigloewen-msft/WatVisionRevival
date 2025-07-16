@@ -23,6 +23,8 @@ function DebugCamera() {
         interimText,
         speechError,
         sessionId,
+        screenDescription,
+        textElements,
         toggleSpeechRecognition,
         explainScreen,
         toggleTrackingScreen,
@@ -97,6 +99,8 @@ function DebugCamera() {
                 interimText={interimText}
                 sessionId={sessionId}
                 trackingScreen={trackingScreen}
+                screenDescription={screenDescription}
+                textElements={textElements}
                 toggleSpeechRecognition={toggleSpeechRecognition}
                 toggleTrackingScreen={toggleTrackingScreen}
                 explainScreen={explainScreen}

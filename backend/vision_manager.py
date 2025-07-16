@@ -111,8 +111,7 @@ class VisionManager:
         task = asyncio.create_task(run_step_task())
         self.visionInstanceList[session_id].step_task = task
 
-    
-    def get_current_image_description(self, session_id):
+    async def get_screen_info(self, session_id):
         if session_id not in self.visionInstanceList:
             raise ValueError(f"Session {session_id} not found")
 

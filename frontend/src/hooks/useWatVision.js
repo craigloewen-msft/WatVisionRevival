@@ -20,6 +20,10 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
     const [speechError, setSpeechError] = useState(null);
     const [sessionId, setSessionId] = useState(null);
 
+    // Screen info states
+    const [screenDescription, setScreenDescription] = useState(null);
+    const [textElements, setTextElements] = useState(null);
+
     // Initialize WatVision after refs are available
     useEffect(() => {
         if (videoCanvas.current && debugInputImageRef.current && debugReferenceImageRef.current) {
@@ -60,11 +64,13 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
                 setSessionId(null);
             });
 
-            watVisionInstance.setOnAudioTranscriptDelta((delta) => {
-                setInterimText(watVisionInstance.audioTranscriptText);
+            // Set up unified callback for all displayed value updates
+            watVisionInstance.setOnDisplayedValueUpdates((instance) => {
+                setInterimText(instance.audioTranscriptText);
+                setTrackingScreen(instance.trackingScreen);
+                setScreenDescription(instance.last_received_screen_description);
+                setTextElements(instance.last_received_text_elements);
             });
-
-            watVisionInstance.externalTrackingScreen = setTrackingScreen;
 
             watVisionInstance.connect();
 
@@ -140,6 +146,8 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
         interimText,
         speechError,
         sessionId,
+        screenDescription,
+        textElements,
         toggleSpeechRecognition,
         explainScreen,
         toggleTrackingScreen,

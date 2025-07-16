@@ -20,6 +20,10 @@ class WatVision {
         this.debugReferenceImageElement = debugReferenceImageElement;
 
         this.waitingForStepReply = false;
+
+        // Screen info properties
+        this.last_received_screen_description = null;
+        this.last_received_text_elements = null;
     }
 
     async captureSourceImage() {
@@ -92,6 +96,23 @@ class WatVision {
         }
     }
 
+    handleScreenInfoResponse(data) {
+        console.log("Handling screen info response:", data);
+        
+        if (data.data && data.data.description) {
+            console.log("Screen data: ", data);
+            // Save the screen description and text elements
+            this.last_received_screen_description = data.data.description;
+            this.last_received_text_elements = data.data.text_elements || null;
+            
+            // Notify React component of the update
+            this.onDisplayedValueUpdates?.(this);
+        } else {
+            console.warn("No screen description available.");
+            this.speechClient.readTextAloud("No screen description available.");
+        }
+    }
+
     doesSourceImageExist() {
         return this.sourceImageCaptured;
     }
@@ -122,21 +143,10 @@ class WatVision {
     }
 
     async explainScreen() {
-        // Query the server for the explanation of the current screen
-        const response = await axios.post("/api/explain_screen/", {
-            session_id: this.getSessionId(),
+        // Send a WebSocket message to request screen information
+        this.sendWebSocketMessage('request_screen_info', {
+            session_id: this.getSessionId()
         });
-        if (response.data.success) {
-            console.log(response.data);
-            const explanation = response.data;
-            if (explanation) {
-                this.speechClient.readTextAloud(explanation.data);
-            } else {
-                console.warn("No explanation available for the current screen.");
-            }
-        } else {
-            console.error("Failed to get explanation:", response.data.error);
-        }
     }
 
     getSessionId() {
@@ -149,6 +159,8 @@ class WatVision {
         this.audioTranscriptText = "";
         this.lastReadText = null;
         this.waitingForStepReply = false;
+        this.last_received_screen_description = null;
+        this.last_received_text_elements = null;
         this.stopTrackingScreen();
         this.speechClient.stopRecording();
     }
@@ -224,7 +236,7 @@ class WatVision {
 
             case 'response.audio_transcript.delta':
                 this.audioTranscriptText += data.event.delta;
-                this.onAudioTranscriptDelta?.(data.event.delta);
+                this.onDisplayedValueUpdates?.(this);
                 break;
 
             case 'response.audio.delta':
@@ -251,6 +263,10 @@ class WatVision {
 
             case 'step_response':
                 this.handleStepResponse(data);
+                break;
+
+            case 'screen_info_response':
+                this.handleScreenInfoResponse(data);
                 break;
 
             default:
@@ -291,12 +307,12 @@ class WatVision {
         }
 
         this.trackingScreen = true;
-        this.externalTrackingScreen?.(true);
+        this.onDisplayedValueUpdates?.(this);
     }
 
     stopTrackingScreen() {
         this.trackingScreen = false;
-        this.externalTrackingScreen?.(false);
+        this.onDisplayedValueUpdates?.(this);
         this.sourceImageCaptured = false;
     }
 
@@ -323,14 +339,8 @@ class WatVision {
         this.onSessionStopped = callback;
     }
 
-    setOnAudioTranscriptDelta(callback) {
-        this.onAudioTranscriptDelta = callback;
-    }
-
-    // Additional helpers
-
-    setExternalTrackingScreen(setIsTracking) {
-        this.externalTrackingScreen = setIsTracking;
+    setOnDisplayedValueUpdates(callback) {
+        this.onDisplayedValueUpdates = callback;
     }
 
     blobToBase64(blob) {

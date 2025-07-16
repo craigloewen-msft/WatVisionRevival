@@ -80,21 +80,6 @@ async def get_version():
         }
     }
 
-@app.post("/api/explain_screen/")
-async def explain_screen(session_id: str = Form(...)):
-    """Get current image description"""
-    try:
-        if not session_id:
-            raise HTTPException(status_code=400, detail="Session ID is required")
-
-        result = vision_manager.get_current_image_description(session_id)
-        return {"success": True, "data": result}
-    
-    except Exception as e:
-        print(f'Error in explain_screen: {e}')
-        print(f'Traceback:\n{traceback.format_exc()}')
-        raise HTTPException(status_code=500, detail=str(e))
-
 # @app.post("/api/set_source_image/")
 # async def set_source_image(
 #     session_id: str = Form(...),
@@ -199,6 +184,14 @@ async def handle_websocket_message(session_id: str, data: dict, websocket: WebSo
             source_image_bytes = base64.b64decode(source_image)
             
             await vision_manager.set_source_image(session_id, source_image_bytes)
+            
+        elif message_type == "request_screen_info":
+            print(f'Requesting screen info for session {session_id}')
+            screen_info = await vision_manager.get_screen_info(session_id)
+            await websocket.send_json({
+                "type": "screen_info_response",
+                "data": screen_info
+            })
             
         else:
             print(f'Unhandled message type {message_type} for session {session_id}')
