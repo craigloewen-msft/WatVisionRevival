@@ -82,9 +82,15 @@ class WatVision {
         let inputImageData = data.data.input_image;
         let sourceImageData = data.data.source_image;
         let textUnderFinger = data.data.text_under_finger;
+        let distanceToTrackedElement = data.data.distance_to_tracked_element;
 
         this.debugInputImageElement.src = `data:image/png;base64,${inputImageData}`;
         this.debugReferenceImageElement.src = `data:image/png;base64,${sourceImageData}`;
+
+        // Play proximity chirp if we have distance data and are tracking an element
+        if (distanceToTrackedElement !== undefined && this.trackedElementIndex !== null) {
+            this.speechClient.playProximityChirp(distanceToTrackedElement);
+        }
 
         // Automatically read out text under finger if it exists and is different from last read text
         if (textUnderFinger && textUnderFinger.text && textUnderFinger.text !== this.lastReadText) {

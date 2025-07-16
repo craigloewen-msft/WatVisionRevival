@@ -196,6 +196,66 @@ class SpeechStreamingClient {
         // Speak the text
         this.textToSpeech.speak(utterance);
     }
+
+    playProximityChirp(distance) {
+        try {
+            // Ensure we have a playback audio context
+            if (!this.playbackAudioContext || this.playbackAudioContext.state === 'closed') {
+                this.playbackAudioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: 24000
+                });
+            }
+
+            // Resume audio context if it's suspended (browser requirement)
+            if (this.playbackAudioContext.state === 'suspended') {
+                this.playbackAudioContext.resume();
+            }
+
+            if (!distance || isNaN(distance)) {
+                console.warn("Invalid distance for proximity chirp:", distance);
+                return;
+            }
+
+            // Calculate frequency based on distance using Gaussian function
+            // Closer = higher pitch, farther = lower pitch
+            const maxDistance = 200;
+            const maxFreq = 4000; // Peak frequency at distance 0
+            const minFreq = 100;  // Base frequency at far distances
+            
+            // Clamp distance to reasonable range
+            const clampedDistance = Math.min(Math.max(distance, 0), maxDistance);
+            
+            const sigma = 60;
+            const gaussianFactor = Math.exp(-(clampedDistance * clampedDistance) / (2 * sigma * sigma));
+            
+            // Calculate frequency with Gaussian relationship
+            const frequency = minFreq + (maxFreq - minFreq) * gaussianFactor;
+
+            // Create and play the chirp
+            const oscillator = this.playbackAudioContext.createOscillator();
+            const gainNode = this.playbackAudioContext.createGain();
+
+            console.log("Playing proximity chirp at frequency:", frequency, "with distance:", distance);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(this.playbackAudioContext.destination);
+
+            oscillator.frequency.setValueAtTime(frequency, this.playbackAudioContext.currentTime);
+            oscillator.type = 'sine';
+
+            // Short chirp duration - quick and unobtrusive
+            const chirpDuration = 0.1;
+            gainNode.gain.setValueAtTime(0, this.playbackAudioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.15, this.playbackAudioContext.currentTime + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, this.playbackAudioContext.currentTime + chirpDuration);
+
+            oscillator.start(this.playbackAudioContext.currentTime);
+            oscillator.stop(this.playbackAudioContext.currentTime + chirpDuration);
+
+        } catch (error) {
+            console.error('Error playing proximity chirp:', error);
+        }
+    }
 }
 
 export default SpeechStreamingClient;
