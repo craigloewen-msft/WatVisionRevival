@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 /**
  * Shared component for WatVision debug controls and status display
@@ -21,6 +21,9 @@ function DebugControls({
     trackElement,
     stopTrackingElement,
 }) {
+    const [audioDebugError, setAudioDebugError] = useState(null);
+    const [audioDebugSuccess, setAudioDebugSuccess] = useState(false);
+
     return (
         <>
             {/* Status Display */}
@@ -88,7 +91,55 @@ function DebugControls({
                             disabled={!watVision}>
                             <i className="fas fa-question-circle"></i> Explain Screen
                         </button>
+                        <button
+                            className="btn btn-warning"
+                            onClick={() => {
+                                // Reset previous states
+                                setAudioDebugError(null);
+                                setAudioDebugSuccess(false);
+                                
+                                // Play a test sound to unlock audio permissions on mobile/untrusted HTTPS
+                                try {
+                                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                                    const oscillator = audioContext.createOscillator();
+                                    const gainNode = audioContext.createGain();
+                                    
+                                    oscillator.connect(gainNode);
+                                    gainNode.connect(audioContext.destination);
+                                    
+                                    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                                    oscillator.type = 'sine';
+                                    
+                                    // Short beep
+                                    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                                    gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.05);
+                                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+                                    
+                                    oscillator.start(audioContext.currentTime);
+                                    oscillator.stop(audioContext.currentTime + 0.3);
+                                    
+                                    console.log('Debug sound played - audio permissions should now be unlocked');
+                                    setAudioDebugSuccess(true);
+                                    // Clear success message after 3 seconds
+                                    setTimeout(() => setAudioDebugSuccess(false), 3000);
+                                } catch (error) {
+                                    console.error('Error playing debug sound:', error);
+                                    setAudioDebugError(error.message || 'Unknown audio error');
+                                }
+                            }}>
+                            <i className="fas fa-volume-up"></i> Debug: Play Sound
+                        </button>
                     </div>
+                    {audioDebugError && (
+                        <div className="alert alert-danger mt-2" role="alert">
+                            <i className="fas fa-exclamation-triangle"></i> Audio Error: {audioDebugError}
+                        </div>
+                    )}
+                    {audioDebugSuccess && (
+                        <div className="alert alert-success mt-2" role="alert">
+                            <i className="fas fa-check-circle"></i> Audio test successful! Audio permissions unlocked.
+                        </div>
+                    )}
                     {!sourceImageCaptured && (
                         <small className="text-muted d-block mt-2 text-center">
                             <i className="fas fa-info-circle"></i> Capture a screen image first before starting tracking
