@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useVideoProcessing } from "../hooks/useVideoProcessing";
-import { WatVisionDebugWrapper, useWatVisionDebugWrapper } from "../components/WatVisionDebugWrapper";
+import { useWatVisionDebugWrapper } from "../components/WatVisionDebugWrapper";
+import { DebugControls, DebugImages } from '../components/DebugShared';
 
 function DebugVideo() {
     const videoRef = useRef(null);
@@ -11,11 +12,13 @@ function DebugVideo() {
     const [videoLoaded, setVideoLoaded] = useState(false);
 
     // Use the hook-based wrapper to get WatVision state
-    const { watVision, setLoading, setError } = useWatVisionDebugWrapper({
+    const watVisionProps = useWatVisionDebugWrapper({
         videoCanvas,
         debugInputImageRef,
         debugReferenceImageRef
     });
+
+    const { watVision, setLoading, setError } = watVisionProps;
 
     // Use shared video processing hook
     useVideoProcessing({
@@ -48,31 +51,32 @@ function DebugVideo() {
         <div className="container">
             <h3>Video Debug Page</h3>
             
-            <WatVisionDebugWrapper
-                videoCanvas={videoCanvas}
+            <DebugControls {...watVisionProps} />
+            
+            <div className="row">
+                <div className="col-6">
+                    <h3>Input Video</h3>
+                    <video
+                        ref={videoRef}
+                        src="/input-small.mp4"
+                        className="img-fluid"
+                        controls
+                        loop
+                        autoPlay
+                        muted
+                        style={{ maxWidth: "100%" }}
+                    />
+                </div>
+                <div className="col-6">
+                    <h3>Video Canvas</h3>
+                    <canvas ref={videoCanvas} className="img-fluid" />
+                </div>
+            </div>
+            
+            <DebugImages 
                 debugInputImageRef={debugInputImageRef}
                 debugReferenceImageRef={debugReferenceImageRef}
-            >
-                <div className="row">
-                    <div className="col-6">
-                        <h3>Input Video</h3>
-                        <video
-                            ref={videoRef}
-                            src="/input-small.mp4"
-                            className="img-fluid"
-                            controls
-                            loop
-                            autoPlay
-                            muted
-                            style={{ maxWidth: "100%" }}
-                        />
-                    </div>
-                    <div className="col-6">
-                        <h3>Video Canvas</h3>
-                        <canvas ref={videoCanvas} className="img-fluid" />
-                    </div>
-                </div>
-            </WatVisionDebugWrapper>
+            />
         </div>
     );
 }
