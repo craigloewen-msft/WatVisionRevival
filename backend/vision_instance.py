@@ -110,6 +110,12 @@ class VisionInstance:
         self.source_image = source_image
         self.source_debug_image = source_image.copy()
 
+        # Print source image information
+        height, width = source_image.shape[:2]
+        channels = source_image.shape[2] if len(source_image.shape) > 2 else 1
+        dtype = source_image.dtype
+        print(f"Source image set - Resolution: {width}x{height}, Channels: {channels}, Data type: {dtype}, Size: {source_image.nbytes} bytes")
+
         self.text_info = self.__get_text_info(image_path)
         
         # Reset homography stabilization for new source image
