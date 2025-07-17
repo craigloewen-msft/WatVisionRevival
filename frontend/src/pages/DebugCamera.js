@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useWatVision } from "../hooks/useWatVision";
 import { useVideoProcessing } from "../hooks/useVideoProcessing";
-import { useWatVisionDebugWrapper } from "../components/WatVisionDebugWrapper";
-import { DebugControls, DebugImages } from '../components/DebugShared';
+import { DebugControls, DebugImages } from "../components/DebugShared";
 
 function DebugCamera() {
     const videoRef = useRef(null);
@@ -11,14 +11,31 @@ function DebugCamera() {
 
     const [videoLoaded, setVideoLoaded] = useState(false);
 
-    // Use the hook-based wrapper to get WatVision state
-    const watVisionProps = useWatVisionDebugWrapper({
+    // Use shared WatVision hook
+    const {
+        watVision,
+        loading,
+        setLoading,
+        error,
+        setError,
+        sourceImageCaptured,
+        isRecording,
+        interimText,
+        speechError,
+        sessionId,
+        screenDescription,
+        textElements,
+        trackedElementIndex,
+        toggleSpeechRecognition,
+        explainScreen,
+        captureScreen,
+        trackElement,
+        stopTrackingElement,
+    } = useWatVision({
         videoCanvas,
         debugInputImageRef,
         debugReferenceImageRef
     });
-
-    const { watVision, setLoading, setError } = watVisionProps;
 
     // Use shared video processing hook
     useVideoProcessing({
@@ -74,7 +91,24 @@ function DebugCamera() {
         <div className="container">
             <h3>Debug Camera</h3>
             
-            <DebugControls {...watVisionProps} />
+            <DebugControls 
+                watVision={watVision}
+                loading={loading}
+                error={error}
+                isRecording={isRecording}
+                speechError={speechError}
+                interimText={interimText}
+                sessionId={sessionId}
+                sourceImageCaptured={sourceImageCaptured}
+                screenDescription={screenDescription}
+                textElements={textElements}
+                trackedElementIndex={trackedElementIndex}
+                toggleSpeechRecognition={toggleSpeechRecognition}
+                explainScreen={explainScreen}
+                captureScreen={captureScreen}
+                trackElement={trackElement}
+                stopTrackingElement={stopTrackingElement}
+            />
             
             <div className="row">
                 <div className="col-6">
