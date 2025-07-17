@@ -1,11 +1,6 @@
 # Stage 1: Build the frontend
 FROM node:20-slim AS frontend-builder
 
-ARG REACT_APP_WEBSOCKET_HOST="home-server:45143"
-ENV REACT_APP_WEBSOCKET_HOST=$REACT_APP_WEBSOCKET_HOST
-
-RUN echo "Using WebSocket host: $REACT_APP_WEBSOCKET_HOST"
-
 WORKDIR /frontend
 
 # Copy only the frontend folder
@@ -13,6 +8,9 @@ COPY frontend/package*.json ./
 RUN npm install
 
 COPY frontend/ ./
+
+ARG REACT_APP_WEBSOCKET_HOST="home-server:45143"
+ENV REACT_APP_WEBSOCKET_HOST=$REACT_APP_WEBSOCKET_HOST
 RUN npm run build
 
 # Then build the application in the `/app` directory
