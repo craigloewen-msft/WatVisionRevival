@@ -44,6 +44,25 @@ class MatchingService:
         Get homography with confidence metric based on inlier ratio.
         Returns (homography_matrix, confidence_score)
         """
+        # Check if XFeat model is available
+        if self.xfeat is None:
+            print("Error: XFeat model not loaded")
+            return None, 0.0
+            
+        # Validate input images
+        if input_image is None or source_image is None:
+            print("Error: One or both input images are None")
+            return None, 0.0
+            
+        if input_image.size == 0 or source_image.size == 0:
+            print("Error: One or both input images are empty")
+            return None, 0.0
+            
+        # Check image dimensions
+        if len(input_image.shape) != 3 or len(source_image.shape) != 3:
+            print(f"Error: Images must be 3-channel. Input shape: {input_image.shape}, Source shape: {source_image.shape}")
+            return None, 0.0
+        
         # Only resize if either dimension is larger than max_dimension pixels
         max_dimension = 600
         
@@ -58,27 +77,63 @@ class MatchingService:
         source_resize_factor = min(1.0, max_dimension / source_max_dim) if source_max_dim > max_dimension else 1.0
         
         # Resize images only if needed
-        if input_resize_factor < 1.0:
-            input_image_resized = cv2.resize(input_image, None, fx=input_resize_factor, fy=input_resize_factor)
-        else:
-            input_image_resized = input_image
+        try:
+            if input_resize_factor < 1.0:
+                input_image_resized = cv2.resize(input_image, None, fx=input_resize_factor, fy=input_resize_factor)
+            else:
+                input_image_resized = input_image
+                
+            if source_resize_factor < 1.0:
+                source_image_resized = cv2.resize(source_image, None, fx=source_resize_factor, fy=source_resize_factor)
+            else:
+                source_image_resized = source_image
+        except Exception as e:
+            print(f"Error resizing images: {e}")
+            return None, 0.0
+
+        # Validate images before processing
+        if source_image_resized.size == 0 or input_image_resized.size == 0:
+            print("Error: One or both images are empty after resizing")
+            return None, 0.0
             
-        if source_resize_factor < 1.0:
-            source_image_resized = cv2.resize(source_image, None, fx=source_resize_factor, fy=source_resize_factor)
-        else:
-            source_image_resized = source_image
+        # Check minimum image dimensions
+        min_dim = 32  # Minimum dimension for feature detection
+        if (source_image_resized.shape[0] < min_dim or source_image_resized.shape[1] < min_dim or
+            input_image_resized.shape[0] < min_dim or input_image_resized.shape[1] < min_dim):
+            print(f"Error: Images too small after resizing. Source: {source_image_resized.shape}, Input: {input_image_resized.shape}")
+            return None, 0.0
 
         # Detect and compute on resized images with fewer features
         top_k = 2048  # Reduce from 4096 to 2048 features
-        output0 = self.xfeat.detectAndCompute(source_image_resized, top_k=top_k)[0]
-        output1 = self.xfeat.detectAndCompute(input_image_resized, top_k=top_k)[0]
+        try:
+            output0 = self.xfeat.detectAndCompute(source_image_resized, top_k=top_k)[0]
+            output1 = self.xfeat.detectAndCompute(input_image_resized, top_k=top_k)[0]
+        except Exception as e:
+            print(f"Error in feature detection: {e}")
+            return None, 0.0
+
+        # Validate feature outputs
+        if (not output0 or not output1 or 
+            'keypoints' not in output0 or 'keypoints' not in output1 or
+            'descriptors' not in output0 or 'descriptors' not in output1):
+            print("Error: Feature detection failed - no valid features found")
+            return None, 0.0
+            
+        # Check if we have enough keypoints
+        if (output0['keypoints'].shape[0] < 4 or output1['keypoints'].shape[0] < 4):
+            print(f"Error: Insufficient keypoints. Source: {output0['keypoints'].shape[0]}, Input: {output1['keypoints'].shape[0]}")
+            return None, 0.0
 
         # Set the image size to the original dimensions
         output0.update({'image_size': (source_image.shape[1], source_image.shape[0])})
         output1.update({'image_size': (input_image.shape[1], input_image.shape[0])})
         
-        # Match features
-        mkpts_0, mkpts_1, other = self.xfeat.match_lighterglue(output0, output1)
+        # Match features with error handling
+        try:
+            mkpts_0, mkpts_1, other = self.xfeat.match_lighterglue(output0, output1)
+        except Exception as e:
+            print(f"Error in feature matching: {e}")
+            return None, 0.0
         
         if len(mkpts_0) < 4:  # Need at least 4 points for homography
             return None, 0.0

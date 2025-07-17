@@ -567,28 +567,29 @@ class VisionInstance:
         if self.source_image is None:
             raise ValueError("Source image is not set. Please set a source image before requesting a description.")
         
-        response = self.llm_client.chat.completions.create(
-            model=self.deployment_name,
-            messages=[
-                { "role": "system", "content": """You are a helpful AI assistant which helps explain an image to a blind or visually impaired person.
-You will keep your answers short and sweet. You will be shown an image of a touch screen and describe that touch screen. Focus on describing what it says and the locations of where things are on the touch screen.""" },
-                { "role": "user", "content": [  
-                    { 
-                        "type": "text", 
-                        "text": "Describe this picture:" 
-                    },
-                    { 
-                        "type": "image_url",
-                        "image_url": {
-                            "url": np_array_image_to_data_url(self.source_image)
-                        }
-                    }
-                ] } 
-            ],
-            max_tokens=2000 
-        )
+#         response = self.llm_client.chat.completions.create(
+#             model=self.deployment_name,
+#             messages=[
+#                 { "role": "system", "content": """You are a helpful AI assistant which helps explain an image to a blind or visually impaired person.
+# You will keep your answers short and sweet. You will be shown an image of a touch screen and describe that touch screen. Focus on describing what it says and the locations of where things are on the touch screen.""" },
+#                 { "role": "user", "content": [  
+#                     { 
+#                         "type": "text", 
+#                         "text": "Describe this picture:" 
+#                     },
+#                     { 
+#                         "type": "image_url",
+#                         "image_url": {
+#                             "url": np_array_image_to_data_url(self.source_image)
+#                         }
+#                     }
+#                 ] } 
+#             ],
+#             max_tokens=2000 
+#         )
         
-        ai_description = response.choices[0].message.content.strip()
+#         ai_description = response.choices[0].message.content.strip()
+        ai_description = "PLACEHOLDER: A touch screen with various words on it."
         
         # Format text_info into a list with IDs
         text_elements = []
