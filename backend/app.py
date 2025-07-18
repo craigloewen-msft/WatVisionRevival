@@ -52,16 +52,18 @@ else:
     host_port = int(os.getenv('PORT', 8000))
     print("Running as development!")
 
-# # Check for SSL certificate files
-# cert_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'ssl', 'server.crt')
-# key_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'ssl', 'server.key')
-# ssl_context = None
+# Check for SSL certificate files
+cert_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'ssl', 'server.crt')
+key_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'ssl', 'server.key')
+ssl_keyfile = None
+ssl_certfile = None
 
-# if os.path.exists(cert_path) and os.path.exists(key_path):
-#     ssl_context = (cert_path, key_path)
-#     print("SSL certificates found, HTTPS enabled")
-# else:
-#     print("SSL certificates not found, running without HTTPS")
+if os.path.exists(cert_path) and os.path.exists(key_path):
+    ssl_keyfile = key_path
+    ssl_certfile = cert_path
+    print("SSL certificates found, HTTPS enabled")
+else:
+    print("SSL certificates not found, running without HTTPS")
 
 # API Routes
 @app.get("/api")
@@ -221,5 +223,7 @@ if __name__ == "__main__":
         "app:app",
         host="0.0.0.0",
         port=host_port,
-        reload=True
+        reload=True,
+        ssl_keyfile=ssl_keyfile,
+        ssl_certfile=ssl_certfile
     )
