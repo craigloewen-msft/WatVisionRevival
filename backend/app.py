@@ -224,6 +224,6 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=host_port,
         reload=True,
-        ssl_keyfile=ssl_keyfile,
-        ssl_certfile=ssl_certfile
+        # ssl_keyfile=ssl_keyfile,
+        # ssl_certfile=ssl_certfile
     )

@@ -159,11 +159,10 @@ class VisionInstance:
             if text_under_finger:
                 print(f"Text under finger: {text_under_finger['text']}")
             
-            # Calculate distance to tracked element if one is being tracked
             if self.tracked_element_index is not None:
                 distance_to_tracked_element = self.get_distance_to_tracked_element(source_finger_tip_location)
                 if distance_to_tracked_element is not None:
-                    print(f"Distance to tracked element: {distance_to_tracked_element:.2f} pixels")
+                    print(f"Finger at ({distance_to_tracked_element['finger_x']:.2f}, {distance_to_tracked_element['finger_y']:.2f}), target at ({distance_to_tracked_element['target_x']:.2f}, {distance_to_tracked_element['target_y']:.2f})")
 
         self.__draw_debug_info(self.input_debug_image, self.source_debug_image, homography, hands_info, input_finger_tip_location, source_finger_tip_location, text_under_finger)
 
@@ -524,18 +523,18 @@ class VisionInstance:
 
     def get_distance_to_tracked_element(self, finger_position):
         """
-        Calculate the distance from fingertip to the tracked element.
+        Get the coordinates of the fingertip and the tracked element center.
         
         Args:
             finger_position (dict): Contains 'x' and 'y' coordinates of the fingertip in the source image space.
         
         Returns:
-            float: Distance in pixels from fingertip to tracked element, or None if no tracked element or finger.
+            dict: Contains finger coordinates and target coordinates, or None if no tracked element or finger.
         """
         if not self.text_info or not finger_position or self.tracked_element_index is None or len(self.text_info) == 0:
             return None
             
-        x, y = finger_position['x'], finger_position['y']
+        finger_x, finger_y = finger_position['x'], finger_position['y']
         
         # Get image dimensions
         original_width = self.text_info[0].width
@@ -559,14 +558,17 @@ class VisionInstance:
         
         # Scale points to current image dimensions
         points = (original_points * np.array([source_width, source_height])).astype(np.int32)
-
-        # For more accurate distance, calculate distance to closest edge
-        # Use pointPolygonTest with measureDist=True to get signed distance
-        signed_distance = cv2.pointPolygonTest(points, (x, y), True)
         
-        # If positive, point is inside (should be 0, but just in case)
-        # If negative, it's the distance to the closest edge
-        return abs(signed_distance)
+        # Calculate the center of the tracked element
+        target_x = np.mean(points[:, 0])
+        target_y = np.mean(points[:, 1])
+        
+        return {
+            "finger_x": float(finger_x),
+            "finger_y": float(finger_y),
+            "target_x": float(target_x),
+            "target_y": float(target_y)
+        }
     
     def get_current_image_description(self):
         # Check if source image is set

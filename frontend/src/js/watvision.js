@@ -88,7 +88,7 @@ class WatVision {
         this.debugReferenceImageElement.src = `data:image/png;base64,${sourceImageData}`;
 
         // Play proximity chirp if we have distance data and are tracking an element
-        if (distanceToTrackedElement !== undefined && this.trackedElementIndex !== null) {
+        if (!textUnderFinger && distanceToTrackedElement !== undefined && this.trackedElementIndex !== null) {
             this.speechClient.playProximityChirp(distanceToTrackedElement);
         }
 

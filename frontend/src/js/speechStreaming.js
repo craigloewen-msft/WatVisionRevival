@@ -197,7 +197,7 @@ class SpeechStreamingClient {
         this.textToSpeech.speak(utterance);
     }
 
-    playProximityChirp(distance) {
+    playProximityChirp(coordinateData) {
         try {
             // Ensure we have a playback audio context
             if (!this.playbackAudioContext || this.playbackAudioContext.state === 'closed') {
@@ -211,46 +211,125 @@ class SpeechStreamingClient {
                 this.playbackAudioContext.resume();
             }
 
+            // Handle both old format (distance as number) and new format (object with coordinates)
+            let distance, direction;
+            // New format with coordinates
+            const dx = coordinateData.target_x - coordinateData.finger_x;
+            const dy = coordinateData.target_y - coordinateData.finger_y;
+
+            // Calculate distance
+            distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Determine direction based on relative position
+            // finger is to the top-right if dx > 0 and dy > 0 (target is down-right from finger)
+            // finger is to the top-left if dx < 0 and dy > 0 (target is down-left from finger)  
+            // finger is to the bottom-left if dx < 0 and dy < 0 (target is up-left from finger)
+            // finger is to the bottom-right if dx > 0 and dy < 0 (target is up-right from finger)
+            if (dx > 0 && dy > 0) {
+                direction = "top-right";  // finger is top-right of target, target is down-right
+            } else if (dx < 0 && dy > 0) {
+                direction = "top-left";   // finger is top-left of target, target is down-left
+            } else if (dx < 0 && dy < 0) {
+                direction = "bottom-left";  // finger is bottom-left of target, target is up-left
+            } else {  // dx > 0 && dy < 0
+                direction = "bottom-right"; // finger is bottom-right of target, target is up-right
+            }
+
             if (!distance || isNaN(distance)) {
                 console.warn("Invalid distance for proximity chirp:", distance);
                 return;
             }
 
-            // Calculate frequency based on distance using Gaussian function
-            // Closer = higher pitch, farther = lower pitch
+            // Base frequency calculation - closer = higher pitch, farther = lower pitch
             const maxDistance = 200;
-            const maxFreq = 4000; // Peak frequency at distance 0
-            const minFreq = 100;  // Base frequency at far distances
-            
+            const baseMaxFreq = 2000; // Base peak frequency at distance 0
+            const baseMinFreq = 200;   // Base frequency at far distances
+
             // Clamp distance to reasonable range
             const clampedDistance = Math.min(Math.max(distance, 0), maxDistance);
-            
+
             const sigma = 60;
             const gaussianFactor = Math.exp(-(clampedDistance * clampedDistance) / (2 * sigma * sigma));
-            
-            // Calculate frequency with Gaussian relationship
-            const frequency = minFreq + (maxFreq - minFreq) * gaussianFactor;
 
-            // Create and play the chirp
-            const oscillator = this.playbackAudioContext.createOscillator();
-            const gainNode = this.playbackAudioContext.createGain();
+            // Calculate base frequency with Gaussian relationship
+            const baseFrequency = baseMinFreq + (baseMaxFreq - baseMinFreq) * gaussianFactor;
 
-            console.log("Playing proximity chirp at frequency:", frequency, "with distance:", distance);
+            // Define directional chirp characteristics with more distinct sounds
+            const directionalChirps = {
+                'top-right': {
+                    // Two quick ascending beeps - high pitched
+                    frequencies: [baseFrequency * 1.5, baseFrequency * 2.0],
+                    durations: [0.08, 0.08],
+                    gains: [0.2, 0.15],
+                    waveTypes: ['sine', 'sine'],
+                    gaps: [0.02] // Small gap between tones
+                },
+                'top-left': {
+                    // Three quick descending chirps - medium-high pitched
+                    frequencies: [baseFrequency * 1.4, baseFrequency * 1.1, baseFrequency * 0.8],
+                    durations: [0.06, 0.06, 0.06],
+                    gains: [0.18, 0.15, 0.12],
+                    waveTypes: ['triangle', 'triangle', 'triangle'],
+                    gaps: [0.01, 0.01]
+                },
+                'bottom-left': {
+                    // Single long low warble - sawtooth wave
+                    frequencies: [baseFrequency * 0.6],
+                    durations: [0.15],
+                    gains: [0.25],
+                    waveTypes: ['sawtooth'],
+                    gaps: []
+                },
+                'bottom-right': {
+                    // Two-tone ascending pattern with square wave - distinctive electronic sound
+                    frequencies: [baseFrequency * 0.5, baseFrequency * 1.0],
+                    durations: [0.12, 0.12],
+                    gains: [0.15, 0.15],
+                    waveTypes: ['square', 'square'],
+                    gaps: [0.03]
+                },
+                'center': {
+                    // Single smooth tone for backward compatibility
+                    frequencies: [baseFrequency],
+                    durations: [0.1],
+                    gains: [0.15],
+                    waveTypes: ['sine'],
+                    gaps: []
+                }
+            };
 
-            oscillator.connect(gainNode);
-            gainNode.connect(this.playbackAudioContext.destination);
+            const chirpConfig = directionalChirps[direction] || directionalChirps['center'];
 
-            oscillator.frequency.setValueAtTime(frequency, this.playbackAudioContext.currentTime);
-            oscillator.type = 'sine';
+            console.log(`Playing proximity chirp: distance=${distance.toFixed(2)}px, direction=${direction}, frequencies=${chirpConfig.frequencies}`);
 
-            // Short chirp duration - quick and unobtrusive
-            const chirpDuration = 0.1;
-            gainNode.gain.setValueAtTime(0, this.playbackAudioContext.currentTime);
-            gainNode.gain.linearRampToValueAtTime(0.15, this.playbackAudioContext.currentTime + 0.01);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, this.playbackAudioContext.currentTime + chirpDuration);
+            // Play the sequence of tones
+            let startTime = this.playbackAudioContext.currentTime;
 
-            oscillator.start(this.playbackAudioContext.currentTime);
-            oscillator.stop(this.playbackAudioContext.currentTime + chirpDuration);
+            chirpConfig.frequencies.forEach((frequency, index) => {
+                const oscillator = this.playbackAudioContext.createOscillator();
+                const gainNode = this.playbackAudioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(this.playbackAudioContext.destination);
+
+                oscillator.frequency.setValueAtTime(frequency, startTime);
+                oscillator.type = chirpConfig.waveTypes[index] || 'sine';
+
+                const duration = chirpConfig.durations[index];
+                const gain = chirpConfig.gains[index];
+
+                // Envelope for smooth attack and decay
+                gainNode.gain.setValueAtTime(0, startTime);
+                gainNode.gain.linearRampToValueAtTime(gain, startTime + 0.01);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+                oscillator.start(startTime);
+                oscillator.stop(startTime + duration);
+
+                // Next tone starts after this one plus any gap
+                const gap = chirpConfig.gaps[index] || 0;
+                startTime += duration + gap;
+            });
 
         } catch (error) {
             console.error('Error playing proximity chirp:', error);
