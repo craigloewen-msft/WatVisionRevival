@@ -17,7 +17,6 @@ function DebugControls({
     trackedElementIndex,
     toggleSpeechRecognition,
     explainScreen,
-    captureScreen,
     trackElement,
     stopTrackingElement,
 }) {
@@ -80,18 +79,12 @@ function DebugControls({
                 <div className="col-12">
                     <div className="d-flex flex-wrap gap-2 justify-content-center">
                         <button
-                            className="btn btn-primary"
-                            onClick={captureScreen}
-                            disabled={!watVision}>
-                            <i className="fas fa-camera"></i> Capture Screen
-                        </button>
-                        <button
                             className="btn btn-info"
                             onClick={explainScreen}
                             disabled={!watVision}>
                             <i className="fas fa-question-circle"></i> Explain Screen
                         </button>
-                        <button
+                        {/* <button
                             className="btn btn-warning"
                             onClick={() => {
                                 // Reset previous states
@@ -128,7 +121,7 @@ function DebugControls({
                                 }
                             }}>
                             <i className="fas fa-volume-up"></i> Debug: Play Sound
-                        </button>
+                        </button> */}
                     </div>
                     {audioDebugError && (
                         <div className="alert alert-danger mt-2" role="alert">

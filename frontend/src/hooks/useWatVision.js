@@ -119,16 +119,6 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
         await watVision.explainScreen();
     };
 
-    const captureScreen = async () => {
-        if (!watVision) return;
-        try {
-            await watVision.captureSourceImage();
-        } catch (err) {
-            console.error("Failed to capture screen:", err);
-            setError(err);
-        }
-    };
-
     // Track a specific element by index
     const trackElement = async (elementIndex) => {
         if (!watVision) return;
@@ -163,7 +153,6 @@ export function useWatVision({ videoCanvas, debugInputImageRef, debugReferenceIm
         trackedElementIndex,
         toggleSpeechRecognition,
         explainScreen,
-        captureScreen,
         trackElement,
         stopTrackingElement,
     };

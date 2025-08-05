@@ -40,6 +40,9 @@ class WatVision {
         return new Promise((resolve) => {
             const checkSourceImageCaptured = () => {
                 if (this.sourceImageCaptured) {
+                    this.sendWebSocketMessage('send_screen_info', {
+                        session_id: this.getSessionId()
+                    });
                     resolve(true);
                 } else {
                     setTimeout(checkSourceImageCaptured, 100); // Check every 100ms
@@ -149,10 +152,7 @@ class WatVision {
     }
 
     async explainScreen() {
-        // Send a WebSocket message to request screen information
-        this.sendWebSocketMessage('request_screen_info', {
-            session_id: this.getSessionId()
-        });
+        await this.captureSourceImage();
     }
 
     async trackElement(elementIndex) {
@@ -211,12 +211,7 @@ class WatVision {
 
         this.socket.onclose = () => {
             console.log('WebSocket disconnected');
-            // Attempt to reconnect after a delay
-            setTimeout(() => {
-                if (!this.socket || this.socket.readyState === WebSocket.CLOSED) {
-                    console.log("Hit error will try to reconnect");
-                }
-            }, 3000);
+            // Attempt to reconnect after a delay TODO
         };
 
         this.socket.onerror = (error) => {
@@ -279,6 +274,10 @@ class WatVision {
                 console.log("Source image set successfully");
                 this.sourceImageCaptured = true;
                 this.onDisplayedValueUpdates?.(this);
+                break;
+            
+            case 'request_capture_source_image':
+                this.captureSourceImage();
                 break;
 
             case 'step_response':

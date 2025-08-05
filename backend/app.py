@@ -151,6 +151,7 @@ async def websocket_endpoint(websocket: WebSocket):
 async def handle_websocket_message(session_id: str, data: dict, websocket: WebSocket):
     """Handle different types of WebSocket messages"""
     message_type = data.get("type", "")
+    print(f'Received message type: {message_type}')
     
     try:
         if message_type == "start_session":
@@ -181,9 +182,9 @@ async def handle_websocket_message(session_id: str, data: dict, websocket: WebSo
             
             print(f'Setting source image for session {session_id}')
             await vision_manager.set_source_image(session_id, source_image_bytes)
-            
-        elif message_type == "request_screen_info":
-            print(f'Requesting screen info for session {session_id}')
+
+        elif message_type == "send_screen_info":
+            print(f'Sending screen info for session {session_id}')
             screen_info = await vision_manager.get_screen_info(session_id)
             await websocket.send_json({
                 "type": "screen_info_response",

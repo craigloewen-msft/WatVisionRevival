@@ -122,8 +122,6 @@ class VisionInstance:
         self.homography_buffer = []
         self.stable_homography = None
 
-        await self.speech_service.finalize_start_touching_touchscreen()
-
         await self.websocket.send_json({
             "type": "source_image_set",
             "data": True
@@ -637,11 +635,16 @@ class VisionInstance:
                             }
                         })
                         text_id += 1
-        
-        return {
+
+
+        return_object = {
             'description': ai_description,
-            'text_elements': text_elements
+            'text_elements': text_elements,
         }
+
+        self.speech_service.finalize_explain_touch_screen_function_call(return_object)
+
+        return return_object
     
     def _calculate_overall_text_bounds(self):
         """
